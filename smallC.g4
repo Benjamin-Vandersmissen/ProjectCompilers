@@ -4,6 +4,7 @@ program
         : 
         | program SEMICOLON
         | program statement SEMICOLON
+        | program SINGLE_LINE_COMMENT
         ;
 
 statement 
@@ -25,7 +26,7 @@ declaration
         ;
         
 assignment
-        : VARIABLE EQUALS operation
+        : VARIABLE ASSIGN operation
         ;
 
 intValue 
@@ -48,6 +49,9 @@ operator
         | MINUS
         | STAR
         | FORWARD_SLASH
+        | LARGER_THAN
+        | SMALLER_THAN
+        | EQUALS
         ;
 
 operand
@@ -60,8 +64,7 @@ operation
         : operand operator operation
         | operand
         | OPEN_BRACKET operation CLOSE_BRACKET
-        ;
-        
+        ;        
 
 OPEN_BRACKET : '(';
 CLOSE_BRACKET: ')';
@@ -71,11 +74,14 @@ INT_TYPE: 'int';
 CHAR_TYPE: 'char';
 FLOAT_TYPE: 'float';
 
-EQUALS : '=';
+ASSIGN : '=';
 MINUS : '-';
 PLUS : '+';
 STAR : '*';
 FORWARD_SLASH : '/';
+LARGER_THAN : '>';
+SMALLER_THAN : '<';
+EQUALS : '==';
 
 DOT : '.';
 
@@ -85,4 +91,12 @@ SINGLE_QUOTE : '\'';
 WHITE_SPACE: [ \n\r\t]+ -> skip;
 ASCII_CHARACTER : SINGLE_QUOTE [\t-~] SINGLE_QUOTE;
 
+IF : 'if';
+ELSE : 'else';
+WHILE : 'while';
+RETURN : 'return';
+
 VARIABLE : [a-zA-Z_][0-9a-zA-Z_]*;
+
+SINGLE_LINE_COMMENT : '//' [\t-~]* -> skip;
+MULTI_LINE_COMMENT : '/*' [\t-~]* '*/' -> skip;

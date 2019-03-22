@@ -9,3 +9,10 @@ int int_test = 12;
 1/1;
 (1+1);
 (2*(3+3));
+//TESTcfghbjnkml
+
+/*
+    MULTILINE COMMENT
+    SOME BULLSHIT
+    blablabla
+*/
