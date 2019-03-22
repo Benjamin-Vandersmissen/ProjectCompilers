@@ -9,13 +9,14 @@ program
 statement 
         : declaration
         | assignment
-        | VARIABLE 
+        | operation
         ;
 
 typeName 
         : INT_TYPE 
         | CHAR_TYPE
         | FLOAT_TYPE
+        | typeName STAR
         ;
 
 declaration 
@@ -24,14 +25,12 @@ declaration
         ;
         
 assignment
-        : VARIABLE EQUALS VARIABLE
-        | VARIABLE EQUALS intValue
-        | VARIABLE EQUALS floatValue
-        | VARIABLE EQUALS charValue
+        : VARIABLE EQUALS operation
         ;
 
 intValue 
         : MINUS DIGIT
+        | PLUS DIGIT
         | DIGIT
         ;
     
@@ -43,6 +42,26 @@ floatValue
 charValue
         :  ASCII_CHARACTER 
         ;
+        
+operator
+        : PLUS
+        | MINUS
+        | STAR
+        | FORWARD_SLASH
+        ;
+
+operand
+        : VARIABLE
+        | intValue
+        | floatValue
+        | charValue
+        ;
+operation
+        : operand operator operation
+        | operand
+        | OPEN_BRACKET operation CLOSE_BRACKET
+        ;
+        
 
 OPEN_BRACKET : '(';
 CLOSE_BRACKET: ')';
@@ -54,6 +73,9 @@ FLOAT_TYPE: 'float';
 
 EQUALS : '=';
 MINUS : '-';
+PLUS : '+';
+STAR : '*';
+FORWARD_SLASH : '/';
 
 DOT : '.';
 

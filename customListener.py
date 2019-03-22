@@ -85,4 +85,33 @@ class customListener(smallCListener):
     # Exit a parse tree produced by smallCParser#charValue.
     def exitCharValue(self, ctx:smallCParser.CharValueContext):
         pass
+        
+     # Enter a parse tree produced by smallCParser#operator.
+    def enterOperator(self, ctx:smallCParser.OperatorContext):
+        print("OPERATOR")
+        print(ctx.getText(), '\n')
+
+    # Exit a parse tree produced by smallCParser#operator.
+    def exitOperator(self, ctx:smallCParser.OperatorContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#operand.
+    def enterOperand(self, ctx:smallCParser.OperandContext):
+        print("OPERAND")
+        print(ctx.getText(), '\n')
+
+    # Exit a parse tree produced by smallCParser#operand.
+    def exitOperand(self, ctx:smallCParser.OperandContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#operation.
+    def enterOperation(self, ctx:smallCParser.OperationContext):
+        print("OPERATION")
+        print(ctx.getText(), '\n')
+
+    # Exit a parse tree produced by smallCParser#operation.
+    def exitOperation(self, ctx:smallCParser.OperationContext):
+        pass
 

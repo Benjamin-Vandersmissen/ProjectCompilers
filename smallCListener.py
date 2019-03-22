@@ -80,3 +80,30 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#operator.
+    def enterOperator(self, ctx:smallCParser.OperatorContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#operator.
+    def exitOperator(self, ctx:smallCParser.OperatorContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#operand.
+    def enterOperand(self, ctx:smallCParser.OperandContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#operand.
+    def exitOperand(self, ctx:smallCParser.OperandContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#operation.
+    def enterOperation(self, ctx:smallCParser.OperationContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#operation.
+    def exitOperation(self, ctx:smallCParser.OperationContext):
+        pass
+
+

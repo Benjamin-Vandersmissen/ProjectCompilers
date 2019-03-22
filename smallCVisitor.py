@@ -49,5 +49,20 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by smallCParser#operator.
+    def visitOperator(self, ctx:smallCParser.OperatorContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#operand.
+    def visitOperand(self, ctx:smallCParser.OperandContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#operation.
+    def visitOperation(self, ctx:smallCParser.OperationContext):
+        return self.visitChildren(ctx)
+
+
 
 del smallCParser
