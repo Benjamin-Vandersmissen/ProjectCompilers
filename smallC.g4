@@ -149,6 +149,7 @@ operand
         | charValue
         | functionCall
         | arrayElement
+        | OPEN_BRACKET operation CLOSE_BRACKET
         ;
       
 sumOperation
@@ -160,14 +161,11 @@ sumOperation
         ;
 
 productOperation
-        : operand STAR operand
-        | operand FORWARD_SLASH operand
-        | operand STAR productOperation
-        | operand FORWARD_SLASH productOperation
-        | OPEN_BRACKET operation CLOSE_BRACKET
+        : productOperation STAR productOperation
+        | productOperation FORWARD_SLASH productOperation
         | operand
         ;
-        
+
 operation
         : sumOperation
         | operation comparator operation
