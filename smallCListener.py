@@ -8,21 +8,21 @@ else:
 # This class defines a complete listener for a parse tree produced by smallCParser.
 class smallCListener(ParseTreeListener):
 
-    # Enter a parse tree produced by smallCParser#start.
-    def enterStart(self, ctx:smallCParser.StartContext):
-        pass
-
-    # Exit a parse tree produced by smallCParser#start.
-    def exitStart(self, ctx:smallCParser.StartContext):
-        pass
-
-
     # Enter a parse tree produced by smallCParser#program.
     def enterProgram(self, ctx:smallCParser.ProgramContext):
         pass
 
     # Exit a parse tree produced by smallCParser#program.
     def exitProgram(self, ctx:smallCParser.ProgramContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#codeBody.
+    def enterCodeBody(self, ctx:smallCParser.CodeBodyContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#codeBody.
+    def exitCodeBody(self, ctx:smallCParser.CodeBodyContext):
         pass
 
 
@@ -62,6 +62,24 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#whileStatement.
+    def enterWhileStatement(self, ctx:smallCParser.WhileStatementContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#whileStatement.
+    def exitWhileStatement(self, ctx:smallCParser.WhileStatementContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#whileBlock.
+    def enterWhileBlock(self, ctx:smallCParser.WhileBlockContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#whileBlock.
+    def exitWhileBlock(self, ctx:smallCParser.WhileBlockContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#typeName.
     def enterTypeName(self, ctx:smallCParser.TypeNameContext):
         pass
@@ -77,6 +95,42 @@ class smallCListener(ParseTreeListener):
 
     # Exit a parse tree produced by smallCParser#declaration.
     def exitDeclaration(self, ctx:smallCParser.DeclarationContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#functionDeclaration.
+    def enterFunctionDeclaration(self, ctx:smallCParser.FunctionDeclarationContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#functionDeclaration.
+    def exitFunctionDeclaration(self, ctx:smallCParser.FunctionDeclarationContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#argumentDeclarationList.
+    def enterArgumentDeclarationList(self, ctx:smallCParser.ArgumentDeclarationListContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#argumentDeclarationList.
+    def exitArgumentDeclarationList(self, ctx:smallCParser.ArgumentDeclarationListContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#functionDefinition.
+    def enterFunctionDefinition(self, ctx:smallCParser.FunctionDefinitionContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#functionDefinition.
+    def exitFunctionDefinition(self, ctx:smallCParser.FunctionDefinitionContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#returnType.
+    def enterReturnType(self, ctx:smallCParser.ReturnTypeContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#returnType.
+    def exitReturnType(self, ctx:smallCParser.ReturnTypeContext):
         pass
 
 
@@ -113,6 +167,24 @@ class smallCListener(ParseTreeListener):
 
     # Exit a parse tree produced by smallCParser#charValue.
     def exitCharValue(self, ctx:smallCParser.CharValueContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#functionCall.
+    def enterFunctionCall(self, ctx:smallCParser.FunctionCallContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#functionCall.
+    def exitFunctionCall(self, ctx:smallCParser.FunctionCallContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#argumentList.
+    def enterArgumentList(self, ctx:smallCParser.ArgumentListContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#argumentList.
+    def exitArgumentList(self, ctx:smallCParser.ArgumentListContext):
         pass
 
 

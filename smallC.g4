@@ -1,42 +1,64 @@
 grammar smallC;
 
-start 
-        : program
+program  
+        : 
+        | program INCLUDE_STDIO
+        | program declaration SEMICOLON
+        | program functionDeclaration SEMICOLON
+        | program functionDefinition
+        | declaration SEMICOLON
+        | functionDeclaration SEMICOLON
+        | functionDefinition
+        | INCLUDE_STDIO
+        | 
         ;    
 
-program 
-        : program SEMICOLON
+codeBody 
+        : codeBody SEMICOLON
         | statement SEMICOLON
-        | program statement SEMICOLON
-        | program SINGLE_LINE_COMMENT
-        | program ifBlock
-        | program ifBlock elseBlock
-        | 
+        | codeBody statement SEMICOLON
+        | codeBody SINGLE_LINE_COMMENT
+        | codeBody ifBlock
+        | codeBody ifBlock elseBlock
+        | codeBody whileBlock 
+        |
         ;
 
 statement 
         : declaration
         | assignment
         | operation
-        | ifStatement
+        | RETURN operation
         ;
 
 ifBlock
         : ifStatement statement SEMICOLON
-        | ifStatement OPEN_CURLY program CLOSE_CURLY
         | ifStatement OPEN_CURLY CLOSE_CURLY
+        | ifStatement OPEN_CURLY codeBody CLOSE_CURLY
         ;
 
 elseBlock
         : ELSE statement SEMICOLON
-        | ELSE OPEN_CURLY program CLOSE_CURLY
         | ELSE OPEN_CURLY CLOSE_CURLY
+        | ELSE OPEN_CURLY codeBody CLOSE_CURLY
         ;
 
 ifStatement
         : IF OPEN_BRACKET assignment CLOSE_BRACKET
         | IF OPEN_BRACKET operation CLOSE_BRACKET
         | IF OPEN_BRACKET typeName assignment CLOSE_BRACKET
+        ;
+        
+whileStatement
+        : WHILE OPEN_BRACKET operation CLOSE_BRACKET
+        | WHILE OPEN_BRACKET assignment CLOSE_BRACKET
+        | WHILE OPEN_BRACKET typeName assignment CLOSE_BRACKET
+        ;
+        
+whileBlock
+        : whileStatement statement SEMICOLON
+        | whileStatement OPEN_CURLY CLOSE_CURLY
+        | whileStatement OPEN_CURLY codeBody CLOSE_CURLY
         ;
 
 typeName 
@@ -49,6 +71,26 @@ typeName
 declaration 
         : typeName VARIABLE 
         | typeName assignment
+        ;
+    
+functionDeclaration
+        : returnType VARIABLE OPEN_BRACKET argumentDeclarationList CLOSE_BRACKET
+        | returnType VARIABLE OPEN_BRACKET CLOSE_BRACKET
+        ;
+        
+argumentDeclarationList
+        : typeName VARIABLE
+        | typeName
+        | argumentDeclarationList COMMA typeName VARIABLE
+        ;
+        
+functionDefinition
+        : functionDeclaration OPEN_CURLY codeBody CLOSE_CURLY
+        ;
+        
+returnType
+        : VOID_TYPE
+        | typeName
         ;
         
 assignment
@@ -70,6 +112,16 @@ charValue
         :  ASCII_CHARACTER 
         ;
         
+functionCall
+        : VARIABLE OPEN_BRACKET CLOSE_BRACKET
+        | VARIABLE OPEN_BRACKET argumentList CLOSE_BRACKET
+        ;
+        
+argumentList
+        : operation
+        | argumentList COMMA operation
+        ;
+        
 operator
         : PLUS
         | MINUS
@@ -85,7 +137,9 @@ operand
         | intValue
         | floatValue
         | charValue
+        | functionCall
         ;
+        
 operation
         : operand operator operation
         | operand
@@ -97,6 +151,7 @@ CLOSE_BRACKET: ')';
 OPEN_CURLY : '{';
 CLOSE_CURLY: '}';
 SEMICOLON: ';';
+COMMA: ',';
 
 INT_TYPE: 'int';
 CHAR_TYPE: 'char';
@@ -128,4 +183,6 @@ RETURN : 'return';
 VARIABLE : [a-zA-Z_][0-9a-zA-Z_]*;
 
 SINGLE_LINE_COMMENT : '//' ~[\n\r]* -> skip;
-MULTI_LINE_COMMENT : '/*' [\t-~]* '*/' -> skip;
+MULTI_LINE_COMMENT : '/*' .*? '*/' -> skip;
+
+INCLUDE_STDIO: '#include' [ ]+ '<stdio.h>';
