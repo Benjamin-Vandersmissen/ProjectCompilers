@@ -8,6 +8,15 @@ else:
 # This class defines a complete listener for a parse tree produced by smallCParser.
 class smallCListener(ParseTreeListener):
 
+    # Enter a parse tree produced by smallCParser#start.
+    def enterStart(self, ctx:smallCParser.StartContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#start.
+    def exitStart(self, ctx:smallCParser.StartContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#program.
     def enterProgram(self, ctx:smallCParser.ProgramContext):
         pass
@@ -23,6 +32,33 @@ class smallCListener(ParseTreeListener):
 
     # Exit a parse tree produced by smallCParser#statement.
     def exitStatement(self, ctx:smallCParser.StatementContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#ifBlock.
+    def enterIfBlock(self, ctx:smallCParser.IfBlockContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#ifBlock.
+    def exitIfBlock(self, ctx:smallCParser.IfBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#elseBlock.
+    def enterElseBlock(self, ctx:smallCParser.ElseBlockContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#elseBlock.
+    def exitElseBlock(self, ctx:smallCParser.ElseBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#ifStatement.
+    def enterIfStatement(self, ctx:smallCParser.IfStatementContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#ifStatement.
+    def exitIfStatement(self, ctx:smallCParser.IfStatementContext):
         pass
 
 

@@ -9,6 +9,11 @@ else:
 
 class smallCVisitor(ParseTreeVisitor):
 
+    # Visit a parse tree produced by smallCParser#start.
+    def visitStart(self, ctx:smallCParser.StartContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#program.
     def visitProgram(self, ctx:smallCParser.ProgramContext):
         return self.visitChildren(ctx)
@@ -16,6 +21,21 @@ class smallCVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by smallCParser#statement.
     def visitStatement(self, ctx:smallCParser.StatementContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#ifBlock.
+    def visitIfBlock(self, ctx:smallCParser.IfBlockContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#elseBlock.
+    def visitElseBlock(self, ctx:smallCParser.ElseBlockContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#ifStatement.
+    def visitIfStatement(self, ctx:smallCParser.IfStatementContext):
         return self.visitChildren(ctx)
 
 

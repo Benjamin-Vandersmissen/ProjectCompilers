@@ -114,4 +114,31 @@ class customListener(smallCListener):
     # Exit a parse tree produced by smallCParser#operation.
     def exitOperation(self, ctx:smallCParser.OperationContext):
         pass
+        
+        # Enter a parse tree produced by smallCParser#ifStatement.
+    def enterIfStatement(self, ctx:smallCParser.IfStatementContext):
+        print("IFSTATEMENT")
+        print(ctx.getText(), '\n')
+
+    # Exit a parse tree produced by smallCParser#ifStatement.
+    def exitIfStatement(self, ctx:smallCParser.IfStatementContext):
+        pass
+    # Enter a parse tree produced by smallCParser#ifBlock.
+    def enterIfBlock(self, ctx:smallCParser.IfBlockContext):
+        print("IF BLOCK")
+        print(ctx.getText(), '\n')
+
+    # Exit a parse tree produced by smallCParser#ifBlock.
+    def exitIfBlock(self, ctx:smallCParser.IfBlockContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#elseBlock.
+    def enterElseBlock(self, ctx:smallCParser.ElseBlockContext):
+        print("ELSE BLOCK")
+        print(ctx.getText(), '\n')
+
+    # Exit a parse tree produced by smallCParser#elseBlock.
+    def exitElseBlock(self, ctx:smallCParser.ElseBlockContext):
+        pass
 
