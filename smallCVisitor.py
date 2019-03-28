@@ -59,6 +59,11 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by smallCParser#arrayList.
+    def visitArrayList(self, ctx:smallCParser.ArrayListContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#functionDeclaration.
     def visitFunctionDeclaration(self, ctx:smallCParser.FunctionDeclarationContext):
         return self.visitChildren(ctx)
@@ -76,6 +81,11 @@ class smallCVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by smallCParser#returnType.
     def visitReturnType(self, ctx:smallCParser.ReturnTypeContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#arrayElement.
+    def visitArrayElement(self, ctx:smallCParser.ArrayElementContext):
         return self.visitChildren(ctx)
 
 

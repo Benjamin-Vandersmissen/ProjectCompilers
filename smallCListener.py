@@ -98,6 +98,15 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#arrayList.
+    def enterArrayList(self, ctx:smallCParser.ArrayListContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#arrayList.
+    def exitArrayList(self, ctx:smallCParser.ArrayListContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#functionDeclaration.
     def enterFunctionDeclaration(self, ctx:smallCParser.FunctionDeclarationContext):
         pass
@@ -131,6 +140,15 @@ class smallCListener(ParseTreeListener):
 
     # Exit a parse tree produced by smallCParser#returnType.
     def exitReturnType(self, ctx:smallCParser.ReturnTypeContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#arrayElement.
+    def enterArrayElement(self, ctx:smallCParser.ArrayElementContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#arrayElement.
+    def exitArrayElement(self, ctx:smallCParser.ArrayElementContext):
         pass
 
 

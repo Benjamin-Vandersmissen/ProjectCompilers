@@ -71,7 +71,16 @@ typeName
 declaration 
         : typeName VARIABLE 
         | typeName assignment
+        | typeName VARIABLE OPEN_SQUARE operation CLOSE_SQUARE
+        | typeName VARIABLE OPEN_SQUARE operation CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
+        | typeName VARIABLE OPEN_SQUARE CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
         ;
+    
+arrayList
+        : arrayList COMMA operation
+        | operation
+        ;
+        
     
 functionDeclaration
         : returnType VARIABLE OPEN_BRACKET argumentDeclarationList CLOSE_BRACKET
@@ -93,8 +102,13 @@ returnType
         | typeName
         ;
         
+arrayElement
+        : VARIABLE OPEN_SQUARE operation CLOSE_SQUARE
+        ;
+        
 assignment
         : VARIABLE ASSIGN operation
+        | arrayElement ASSIGN operation
         ;
 
 intValue 
@@ -138,6 +152,7 @@ operand
         | floatValue
         | charValue
         | functionCall
+        | arrayElement
         ;
         
 operation
@@ -150,6 +165,8 @@ OPEN_BRACKET : '(';
 CLOSE_BRACKET: ')';
 OPEN_CURLY : '{';
 CLOSE_CURLY: '}';
+OPEN_SQUARE : '[';
+CLOSE_SQUARE : ']';
 SEMICOLON: ';';
 COMMA: ',';
 

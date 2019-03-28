@@ -212,4 +212,23 @@ class customListener(smallCListener):
     def exitWhileBlock(self, ctx:smallCParser.WhileBlockContext):
         pass
 
+    
+    # Enter a parse tree produced by smallCParser#arrayList.
+    def enterArrayList(self, ctx:smallCParser.ArrayListContext):
+        print("ARRAY LIST")
+        print(ctx.getText(), '\n')
+
+    # Exit a parse tree produced by smallCParser#arrayList.
+    def exitArrayList(self, ctx:smallCParser.ArrayListContext):
+        pass
+
+        # Enter a parse tree produced by smallCParser#arrayElement.
+    def enterArrayElement(self, ctx:smallCParser.ArrayElementContext):
+        print("ARRAY ELEMENT")
+        print(ctx.getText(), '\n')
+
+    # Exit a parse tree produced by smallCParser#arrayElement.
+    def exitArrayElement(self, ctx:smallCParser.ArrayElementContext):
+        pass
+
 
