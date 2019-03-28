@@ -119,13 +119,23 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by smallCParser#operator.
-    def visitOperator(self, ctx:smallCParser.OperatorContext):
+    # Visit a parse tree produced by smallCParser#comparator.
+    def visitComparator(self, ctx:smallCParser.ComparatorContext):
         return self.visitChildren(ctx)
 
 
     # Visit a parse tree produced by smallCParser#operand.
     def visitOperand(self, ctx:smallCParser.OperandContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#sum.
+    def visitSum(self, ctx:smallCParser.SumContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#product.
+    def visitProduct(self, ctx:smallCParser.ProductContext):
         return self.visitChildren(ctx)
 
 

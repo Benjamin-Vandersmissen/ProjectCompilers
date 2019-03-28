@@ -136,12 +136,8 @@ argumentList
         | argumentList COMMA operation
         ;
         
-operator
-        : PLUS
-        | MINUS
-        | STAR
-        | FORWARD_SLASH
-        | LARGER_THAN
+comparator
+        : LARGER_THAN
         | SMALLER_THAN
         | EQUALS
         ;
@@ -154,12 +150,31 @@ operand
         | functionCall
         | arrayElement
         ;
+      
+sumOperation
+        : productOperation PLUS productOperation
+        | productOperation MINUS productOperation
+        | sumOperation PLUS productOperation
+        | sumOperation MINUS productOperation
+        | productOperation
+        ;
+
+productOperation
+        : operand STAR operand
+        | operand FORWARD_SLASH operand
+        | productOperation STAR operand
+        | productOperation FORWARD_SLASH operand
+        | OPEN_BRACKET operation CLOSE_BRACKET
+        ;
         
 operation
-        : operand operator operation
-        | operand
-        | OPEN_BRACKET operation CLOSE_BRACKET
+        : sumOperation
+        | operation comparator operation
         ;        
+
+        
+
+
 
 OPEN_BRACKET : '(';
 CLOSE_BRACKET: ')';

@@ -206,12 +206,12 @@ class smallCListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by smallCParser#operator.
-    def enterOperator(self, ctx:smallCParser.OperatorContext):
+    # Enter a parse tree produced by smallCParser#comparator.
+    def enterComparator(self, ctx:smallCParser.ComparatorContext):
         pass
 
-    # Exit a parse tree produced by smallCParser#operator.
-    def exitOperator(self, ctx:smallCParser.OperatorContext):
+    # Exit a parse tree produced by smallCParser#comparator.
+    def exitComparator(self, ctx:smallCParser.ComparatorContext):
         pass
 
 
@@ -221,6 +221,24 @@ class smallCListener(ParseTreeListener):
 
     # Exit a parse tree produced by smallCParser#operand.
     def exitOperand(self, ctx:smallCParser.OperandContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#sum.
+    def enterSum(self, ctx:smallCParser.SumContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#sum.
+    def exitSum(self, ctx:smallCParser.SumContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#product.
+    def enterProduct(self, ctx:smallCParser.ProductContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#product.
+    def exitProduct(self, ctx:smallCParser.ProductContext):
         pass
 
 
