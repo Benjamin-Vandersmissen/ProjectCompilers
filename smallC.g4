@@ -162,9 +162,10 @@ sumOperation
 productOperation
         : operand STAR operand
         | operand FORWARD_SLASH operand
-        | productOperation STAR operand
-        | productOperation FORWARD_SLASH operand
+        | operand STAR productOperation
+        | operand FORWARD_SLASH productOperation
         | OPEN_BRACKET operation CLOSE_BRACKET
+        | operand
         ;
         
 operation
