@@ -1,11 +1,11 @@
 grammar smallC;
 
 program  
-        : 
-        | program INCLUDE_STDIO
+        :
         | program declaration SEMICOLON
         | program functionDeclaration SEMICOLON
         | program functionDefinition
+        | program INCLUDE_STDIO
         | declaration SEMICOLON
         | functionDeclaration SEMICOLON
         | functionDefinition
