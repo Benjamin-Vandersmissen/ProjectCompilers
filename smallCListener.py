@@ -8,6 +8,15 @@ else:
 # This class defines a complete listener for a parse tree produced by smallCParser.
 class smallCListener(ParseTreeListener):
 
+    # Enter a parse tree produced by smallCParser#start.
+    def enterStart(self, ctx:smallCParser.StartContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#start.
+    def exitStart(self, ctx:smallCParser.StartContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#program.
     def enterProgram(self, ctx:smallCParser.ProgramContext):
         pass
@@ -224,21 +233,21 @@ class smallCListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by smallCParser#sum.
-    def enterSum(self, ctx:smallCParser.SumContext):
+    # Enter a parse tree produced by smallCParser#sumOperation.
+    def enterSumOperation(self, ctx:smallCParser.SumOperationContext):
         pass
 
-    # Exit a parse tree produced by smallCParser#sum.
-    def exitSum(self, ctx:smallCParser.SumContext):
+    # Exit a parse tree produced by smallCParser#sumOperation.
+    def exitSumOperation(self, ctx:smallCParser.SumOperationContext):
         pass
 
 
-    # Enter a parse tree produced by smallCParser#product.
-    def enterProduct(self, ctx:smallCParser.ProductContext):
+    # Enter a parse tree produced by smallCParser#productOperation.
+    def enterProductOperation(self, ctx:smallCParser.ProductOperationContext):
         pass
 
-    # Exit a parse tree produced by smallCParser#product.
-    def exitProduct(self, ctx:smallCParser.ProductContext):
+    # Exit a parse tree produced by smallCParser#productOperation.
+    def exitProductOperation(self, ctx:smallCParser.ProductOperationContext):
         pass
 
 
@@ -248,6 +257,15 @@ class smallCListener(ParseTreeListener):
 
     # Exit a parse tree produced by smallCParser#operation.
     def exitOperation(self, ctx:smallCParser.OperationContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#identifier.
+    def enterIdentifier(self, ctx:smallCParser.IdentifierContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#identifier.
+    def exitIdentifier(self, ctx:smallCParser.IdentifierContext):
         pass
 
 

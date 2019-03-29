@@ -9,6 +9,11 @@ else:
 
 class smallCVisitor(ParseTreeVisitor):
 
+    # Visit a parse tree produced by smallCParser#start.
+    def visitStart(self, ctx:smallCParser.StartContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#program.
     def visitProgram(self, ctx:smallCParser.ProgramContext):
         return self.visitChildren(ctx)
@@ -129,18 +134,23 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by smallCParser#sum.
-    def visitSum(self, ctx:smallCParser.SumContext):
+    # Visit a parse tree produced by smallCParser#sumOperation.
+    def visitSumOperation(self, ctx:smallCParser.SumOperationContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by smallCParser#product.
-    def visitProduct(self, ctx:smallCParser.ProductContext):
+    # Visit a parse tree produced by smallCParser#productOperation.
+    def visitProductOperation(self, ctx:smallCParser.ProductOperationContext):
         return self.visitChildren(ctx)
 
 
     # Visit a parse tree produced by smallCParser#operation.
     def visitOperation(self, ctx:smallCParser.OperationContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#identifier.
+    def visitIdentifier(self, ctx:smallCParser.IdentifierContext):
         return self.visitChildren(ctx)
 
 
