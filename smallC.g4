@@ -2,12 +2,10 @@ grammar smallC;
 
 start
         : program
-        |
         ;
 
 program
-        :
-        | program declaration SEMICOLON
+        : program declaration SEMICOLON
         | program functionDeclaration SEMICOLON
         | program functionDefinition
         | program INCLUDE_STDIO
@@ -15,6 +13,7 @@ program
         | functionDeclaration SEMICOLON
         | functionDefinition
         | INCLUDE_STDIO
+        | 
         ;
 
 codeBody

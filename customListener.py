@@ -1,6 +1,6 @@
 from smallCListener import smallCListener
 from smallCParser import smallCParser
-
+from antlr4 import TerminalNode
 #
 # TODO: BUGS OPLOSSEN :
 #               START WILT NIET WERKEN ALS OFFICIELE START VAN GRAMMATICA, DUS KOMT ER MEERMAALS digraph VOOR IN DE AST
@@ -21,7 +21,7 @@ def getRule():
 counter = dict()
 tokens = dict()
 stack = list()
-file = open("AST.dot", "w+")
+file = open("AST.dot", "a")
 
 def generateBranch(current):
     global counter, stack, file
@@ -48,12 +48,11 @@ def popStack(context):
         #           we know we have left the original codebody.
         #
         counter[pair[0]] = counter[pair[0]]-1
-        print(context.getText())
     elif pair[1] == counter[pair[0]]:
         stack = stack[:-1]
 
     for child in context.getChildren():
-        if child.getChildCount() == 0:  # token
+        if isinstance(child, TerminalNode):  # token
             token = str(child)
             if token in '{};':  # Negeer deze tokens
                 continue
@@ -85,16 +84,16 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#program.
     def enterProgram(self, ctx:smallCParser.ProgramContext):
         global counter,file
-        parent = getRule()
+        parent = "start"
         counter[parent] = 0
         stack.append((parent, 0))
-        file.write("digraph AST {\n")
+        generateBranch(getRule())
+
 
 
     # Exit a parse tree produced by smallCParser#program.
     def exitProgram(self, ctx:smallCParser.ProgramContext):
-        file.write('\n}')
-
+        popStack(ctx)
 
     # Enter a parse tree produced by smallCParser#codeBody.
     def enterCodeBody(self, ctx:smallCParser.CodeBodyContext):
