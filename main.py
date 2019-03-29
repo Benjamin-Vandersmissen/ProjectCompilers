@@ -11,13 +11,11 @@ def main(argv):
     stream = CommonTokenStream(lexer)
     parser = smallCParser(stream)
     tree = parser.program()
-    file = open("AST.dot", "w+")
-    file.write("digraph AST {\n")
     listener = customListener()
     walker = ParseTreeWalker()
     walker.walk(listener, tree)
     parser.addParseListener(listener)
-    file.write("\n}")
-    
+
+
 if __name__ == '__main__':
     main(sys.argv)
