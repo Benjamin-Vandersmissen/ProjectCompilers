@@ -1,6 +1,11 @@
 grammar smallC;
 
-program  
+start
+        : program
+        |
+        ;
+
+program
         :
         | program declaration SEMICOLON
         | program functionDeclaration SEMICOLON
@@ -10,17 +15,16 @@ program
         | functionDeclaration SEMICOLON
         | functionDefinition
         | INCLUDE_STDIO
-        | 
-        ;    
+        ;
 
-codeBody 
+codeBody
         : codeBody SEMICOLON
         | statement SEMICOLON
         | codeBody statement SEMICOLON
         | codeBody SINGLE_LINE_COMMENT
         | codeBody ifBlock
         | codeBody ifBlock elseBlock
-        | codeBody whileBlock 
+        | codeBody whileBlock
         |
         ;
 
@@ -69,11 +73,11 @@ typeName
         ;
 
 declaration 
-        : typeName VARIABLE 
+        : typeName identifier
         | typeName assignment
-        | typeName VARIABLE OPEN_SQUARE operation CLOSE_SQUARE
-        | typeName VARIABLE OPEN_SQUARE operation CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
-        | typeName VARIABLE OPEN_SQUARE CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
+        | typeName identifier OPEN_SQUARE operation CLOSE_SQUARE
+        | typeName identifier OPEN_SQUARE operation CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
+        | typeName identifier OPEN_SQUARE CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
         ;
     
 arrayList
@@ -83,14 +87,14 @@ arrayList
         
     
 functionDeclaration
-        : returnType VARIABLE OPEN_BRACKET argumentDeclarationList CLOSE_BRACKET
-        | returnType VARIABLE OPEN_BRACKET CLOSE_BRACKET
+        : returnType identifier OPEN_BRACKET argumentDeclarationList CLOSE_BRACKET
+        | returnType identifier OPEN_BRACKET CLOSE_BRACKET
         ;
         
 argumentDeclarationList
-        : typeName VARIABLE
+        : typeName identifier
         | typeName
-        | argumentDeclarationList COMMA typeName VARIABLE
+        | argumentDeclarationList COMMA typeName identifier
         ;
         
 functionDefinition
@@ -103,11 +107,11 @@ returnType
         ;
         
 arrayElement
-        : VARIABLE OPEN_SQUARE operation CLOSE_SQUARE
+        : identifier OPEN_SQUARE operation CLOSE_SQUARE
         ;
         
 assignment
-        : VARIABLE ASSIGN operation
+        : identifier ASSIGN operation
         | arrayElement ASSIGN operation
         ;
 
@@ -127,8 +131,8 @@ charValue
         ;
         
 functionCall
-        : VARIABLE OPEN_BRACKET CLOSE_BRACKET
-        | VARIABLE OPEN_BRACKET argumentList CLOSE_BRACKET
+        : identifier OPEN_BRACKET CLOSE_BRACKET
+        | identifier OPEN_BRACKET argumentList CLOSE_BRACKET
         ;
         
 argumentList
@@ -143,7 +147,7 @@ comparator
         ;
 
 operand
-        : VARIABLE
+        : identifier
         | intValue
         | floatValue
         | charValue
@@ -171,7 +175,9 @@ operation
         | operation comparator operation
         ;        
 
-        
+identifier
+        : VARIABLE
+        ;
 
 
 
