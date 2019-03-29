@@ -17,7 +17,7 @@ def main(argv):
     walker = ParseTreeWalker()
     walker.walk(listener, tree)
     parser.addParseListener(listener)
-
+    file.write("\n}")
     
 if __name__ == '__main__':
     main(sys.argv)
