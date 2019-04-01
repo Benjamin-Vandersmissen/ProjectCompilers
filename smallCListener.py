@@ -107,6 +107,69 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#constantDeclaration.
+    def enterConstantDeclaration(self, ctx:smallCParser.ConstantDeclarationContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantDeclaration.
+    def exitConstantDeclaration(self, ctx:smallCParser.ConstantDeclarationContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constantArrayList.
+    def enterConstantArrayList(self, ctx:smallCParser.ConstantArrayListContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantArrayList.
+    def exitConstantArrayList(self, ctx:smallCParser.ConstantArrayListContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constantAssignment.
+    def enterConstantAssignment(self, ctx:smallCParser.ConstantAssignmentContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantAssignment.
+    def exitConstantAssignment(self, ctx:smallCParser.ConstantAssignmentContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constantExpression.
+    def enterConstantExpression(self, ctx:smallCParser.ConstantExpressionContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantExpression.
+    def exitConstantExpression(self, ctx:smallCParser.ConstantExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constantSum.
+    def enterConstantSum(self, ctx:smallCParser.ConstantSumContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantSum.
+    def exitConstantSum(self, ctx:smallCParser.ConstantSumContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constantProduct.
+    def enterConstantProduct(self, ctx:smallCParser.ConstantProductContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantProduct.
+    def exitConstantProduct(self, ctx:smallCParser.ConstantProductContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constant.
+    def enterConstant(self, ctx:smallCParser.ConstantContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constant.
+    def exitConstant(self, ctx:smallCParser.ConstantContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#arrayList.
     def enterArrayList(self, ctx:smallCParser.ArrayListContext):
         pass

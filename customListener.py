@@ -37,6 +37,7 @@ def generateBranch(current):
 
 def popStack(context):
     global stack, tokens
+    pair = stack[-1]
     stack = stack[:-1]
 
     for child in context.getChildren():
@@ -187,6 +188,61 @@ class customListener(smallCListener):
         #print("Leave: ", getRule(), ctx.getText())
         popStack(ctx)
 
+        # Enter a parse tree produced by smallCParser#constantDeclaration.
+    def enterConstantDeclaration(self, ctx: smallCParser.ConstantDeclarationContext):
+        generateBranch(getRule())
+
+        # Exit a parse tree produced by smallCParser#constantDeclaration.
+    def exitConstantDeclaration(self, ctx: smallCParser.ConstantDeclarationContext):
+        popStack(ctx)
+
+        # Enter a parse tree produced by smallCParser#constantArrayList.
+    def enterConstantArrayList(self, ctx: smallCParser.ConstantArrayListContext):
+        generateBranch(getRule())
+
+    # Exit a parse tree produced by smallCParser#constantArrayList.
+    def exitConstantArrayList(self, ctx: smallCParser.ConstantArrayListContext):
+        popStack(ctx)
+
+    # Enter a parse tree produced by smallCParser#constantAssignment.
+    def enterConstantAssignment(self, ctx: smallCParser.ConstantAssignmentContext):
+        generateBranch(getRule())
+
+    # Exit a parse tree produced by smallCParser#constantAssignment.
+    def exitConstantAssignment(self, ctx: smallCParser.ConstantAssignmentContext):
+        popStack(ctx)
+
+    # Enter a parse tree produced by smallCParser#constantExpression.
+    def enterConstantExpression(self, ctx: smallCParser.ConstantExpressionContext):
+        generateBranch(getRule())
+
+    # Exit a parse tree produced by smallCParser#constantExpression.
+    def exitConstantExpression(self, ctx: smallCParser.ConstantExpressionContext):
+        popStack(ctx)
+
+    # Enter a parse tree produced by smallCParser#constantSum.
+    def enterConstantSum(self, ctx: smallCParser.ConstantSumContext):
+        generateBranch(getRule())
+
+    # Exit a parse tree produced by smallCParser#constantSum.
+    def exitConstantSum(self, ctx: smallCParser.ConstantSumContext):
+        popStack(ctx)
+
+    # Enter a parse tree produced by smallCParser#constantProduct.
+    def enterConstantProduct(self, ctx: smallCParser.ConstantProductContext):
+        generateBranch(getRule())
+
+    # Exit a parse tree produced by smallCParser#constantProduct.
+    def exitConstantProduct(self, ctx: smallCParser.ConstantProductContext):
+        popStack(ctx)
+
+    # Enter a parse tree produced by smallCParser#constant.
+    def enterConstant(self, ctx: smallCParser.ConstantContext):
+        generateBranch(getRule())
+
+    # Exit a parse tree produced by smallCParser#constant.
+    def exitConstant(self, ctx: smallCParser.ConstantContext):
+        popStack(ctx)
 
     # Enter a parse tree produced by smallCParser#arrayList.
     def enterArrayList(self, ctx:smallCParser.ArrayListContext):

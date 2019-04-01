@@ -64,6 +64,41 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by smallCParser#constantDeclaration.
+    def visitConstantDeclaration(self, ctx:smallCParser.ConstantDeclarationContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constantArrayList.
+    def visitConstantArrayList(self, ctx:smallCParser.ConstantArrayListContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constantAssignment.
+    def visitConstantAssignment(self, ctx:smallCParser.ConstantAssignmentContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constantExpression.
+    def visitConstantExpression(self, ctx:smallCParser.ConstantExpressionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constantSum.
+    def visitConstantSum(self, ctx:smallCParser.ConstantSumContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constantProduct.
+    def visitConstantProduct(self, ctx:smallCParser.ConstantProductContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constant.
+    def visitConstant(self, ctx:smallCParser.ConstantContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#arrayList.
     def visitArrayList(self, ctx:smallCParser.ArrayListContext):
         return self.visitChildren(ctx)

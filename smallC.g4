@@ -5,11 +5,11 @@ start
         ;
 
 program
-        : program declaration SEMICOLON
+        : program constantDeclaration SEMICOLON
         | program functionDeclaration SEMICOLON
         | program functionDefinition
         | program INCLUDE_STDIO
-        | declaration SEMICOLON
+        | constantDeclaration SEMICOLON
         | functionDeclaration SEMICOLON
         | functionDefinition
         | INCLUDE_STDIO
@@ -71,14 +71,57 @@ typeName
         | typeName STAR
         ;
 
-declaration 
-        : typeName identifier
+declaration
+        : constantDeclaration
+        | typeName identifier
         | typeName assignment
         | typeName identifier OPEN_SQUARE operation CLOSE_SQUARE
         | typeName identifier OPEN_SQUARE operation CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
         | typeName identifier OPEN_SQUARE CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
         ;
-    
+
+constantDeclaration
+        : typeName identifier
+        | typeName constantAssignment
+        | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE
+        | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE ASSIGN OPEN_CURLY constantArrayList CLOSE_CURLY
+        | typeName identifier OPEN_SQUARE CLOSE_SQUARE ASSIGN OPEN_CURLY constantArrayList CLOSE_CURLY
+        ;
+
+constantArrayList
+        : arrayList COMMA constantExpression
+        | constantExpression
+        ;
+
+constantAssignment
+        : identifier ASSIGN constantExpression
+        | identifier OPEN_SQUARE constantExpression CLOSE_SQUARE ASSIGN constantExpression
+        ;
+
+constantExpression
+        : constantExpression comparator constantExpression
+        | constantSum
+        ;
+
+constantSum
+        : constantSum PLUS constantSum
+        | constantSum MINUS constantSum
+        | constantProduct
+        ;
+
+constantProduct
+        : constantProduct STAR constantProduct
+        | constantProduct FORWARD_SLASH constantProduct
+        | constant
+        ;
+
+constant
+        : intValue
+        | floatValue
+        | charValue
+        | OPEN_BRACKET constantExpression CLOSE_BRACKET
+        ;
+
 arrayList
         : arrayList COMMA operation
         | operation
