@@ -213,7 +213,8 @@ productOperation
         ;
 
 operation
-        : sumOperation
+        : constantExpression
+        | sumOperation
         | operation comparator operation
         ;        
 
