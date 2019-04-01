@@ -1,6 +1,8 @@
 from smallCListener import smallCListener
 from smallCParser import smallCParser
 from antlr4 import TerminalNode
+from TreeNodes import *
+
 
 def getRule():
     import sys
@@ -17,10 +19,11 @@ counter = dict()
 tokens = dict()
 stack = list()
 file = open("AST.dot", "w+")
+parent = None
 
 
-def generateBranch(current):
-    global counter, stack, file, depth
+def generateBranch(current, treeNode):
+    global counter, stack, file, parent
 
     pair = stack[-1]
 
@@ -28,6 +31,8 @@ def generateBranch(current):
         counter[current] = 0
 
     if current != pair[0]:
+        parent.add(treeNode)
+        parent = treeNode
         file.write('\t"' + pair[0] + '_' + str(pair[1]) + '" -> "' +
                     current + '_' + str(counter[current]) + '";\n')
         stack.append((current, counter[current]))
@@ -35,28 +40,39 @@ def generateBranch(current):
     elif current == pair[0]:
         stack.append(stack[-1])
 
+def addTerminalNode(node):
+    global stack, tokens, parent
+    pair = stack[-1]
+    token = str(node)
+
+    parent.add(TokenNode(token))
+
+    if token in '{};(),=':  # Negeer deze tokens
+        return
+    if token not in tokens:
+        tokens[token] = 0
+    else:
+        tokens[token] += 1
+
+    file.write('\t"' + pair[0] + '_' + str(pair[1]) + '"-> "TOKEN_' +
+               token + '_' + str(tokens[token]) + '" [style=dotted];\n')
+    file.write('\t"TOKEN_' + token + '_' + str(tokens[token]) + '" [shape=plaintext];\n')
+
 def popStack(context):
-    global stack, tokens
+    global stack, tokens, parent
     pair = stack[-1]
     stack = stack[:-1]
 
-    for child in context.getChildren():
-        if isinstance(child, TerminalNode):  # token
-            token = str(child)
-            if token in '{};(),=':  # Negeer deze tokens
-                continue
-            if token not in tokens:
-                tokens[token] = 0
-            else:
-                tokens[token] += 1
-            file.write('\t"' + pair[0] + '_' + str(pair[1]) + '"-> "TOKEN_' +
-                       token + '_' + str(tokens[token]) + '" [style=dotted];\n')
-            file.write('\t"TOKEN_' + token + '_' + str(tokens[token]) + '" [shape=plaintext];\n')
-
     if len(stack) == 0:
         file.write('\n}')
+        print(parent.text())
+    elif pair != stack[-1]:
+        parent = parent.parent
 
 class customListener(smallCListener):
+
+    def visitTerminal(self, node:TerminalNode):
+        addTerminalNode(node)
 
     # Enter a parse tree produced by smallCParser#start.
     def enterStart(self, ctx:smallCParser.StartContext):
@@ -73,15 +89,17 @@ class customListener(smallCListener):
 
     # Enter a parse tree produced by smallCParser#program.
     def enterProgram(self, ctx:smallCParser.ProgramContext):
-        global counter, file, stack
-        parent = getRule()
-        if parent not in counter:
-            counter[parent] = 0
+        global counter, file, stack, parent
+        if parent is None:
+            parent = ProgramNode()
+        rule = getRule()
+        if rule not in counter:
+            counter[rule] = 0
             file.write("digraph AST {\n")
-            stack.append((parent, 0))
+            stack.append((rule, 0))
         else:
-            counter[parent] += 1
-            stack.append((parent, 0))
+            counter[rule] += 1
+            stack.append((rule, 0))
 
 
     # Exit a parse tree produced by smallCParser#program.
@@ -93,7 +111,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#codeBody.
     def enterCodeBody(self, ctx:smallCParser.CodeBodyContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), CodeBodyNode())
 
     # Exit a parse tree produced by smallCParser#codeBody.
     def exitCodeBody(self, ctx:smallCParser.CodeBodyContext):
@@ -104,7 +122,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#statement.
     def enterStatement(self, ctx:smallCParser.StatementContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), StatementNode())
 
     # Exit a parse tree produced by smallCParser#statement.
     def exitStatement(self, ctx:smallCParser.StatementContext):
@@ -115,7 +133,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#ifBlock.
     def enterIfBlock(self, ctx:smallCParser.IfBlockContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), IfBlockNode())
 
     # Exit a parse tree produced by smallCParser#ifBlock.
     def exitIfBlock(self, ctx:smallCParser.IfBlockContext):
@@ -126,7 +144,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#elseBlock.
     def enterElseBlock(self, ctx:smallCParser.ElseBlockContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), ElseBlockNode())
 
     # Exit a parse tree produced by smallCParser#elseBlock.
     def exitElseBlock(self, ctx:smallCParser.ElseBlockContext):
@@ -137,7 +155,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#ifStatement.
     def enterIfStatement(self, ctx:smallCParser.IfStatementContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), IfStatementNode())
 
     # Exit a parse tree produced by smallCParser#ifStatement.
     def exitIfStatement(self, ctx:smallCParser.IfStatementContext):
@@ -148,7 +166,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#whileStatement.
     def enterWhileStatement(self, ctx:smallCParser.WhileStatementContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), WhileStatementNode())
 
     # Exit a parse tree produced by smallCParser#whileStatement.
     def exitWhileStatement(self, ctx:smallCParser.WhileStatementContext):
@@ -159,7 +177,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#whileBlock.
     def enterWhileBlock(self, ctx:smallCParser.WhileBlockContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), WhileBlockNode())
 
     # Exit a parse tree produced by smallCParser#whileBlock.
     def exitWhileBlock(self, ctx:smallCParser.WhileBlockContext):
@@ -170,7 +188,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#typeName.
     def enterTypeName(self, ctx:smallCParser.TypeNameContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), TypeNameNode())
 
     # Exit a parse tree produced by smallCParser#typeName.
     def exitTypeName(self, ctx:smallCParser.TypeNameContext):
@@ -181,7 +199,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#declaration.
     def enterDeclaration(self, ctx:smallCParser.DeclarationContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), DeclarationNode())
 
     # Exit a parse tree produced by smallCParser#declaration.
     def exitDeclaration(self, ctx:smallCParser.DeclarationContext):
@@ -190,7 +208,7 @@ class customListener(smallCListener):
 
         # Enter a parse tree produced by smallCParser#constantDeclaration.
     def enterConstantDeclaration(self, ctx: smallCParser.ConstantDeclarationContext):
-        generateBranch(getRule())
+        generateBranch(getRule(), ConstantDeclarationNode())
 
         # Exit a parse tree produced by smallCParser#constantDeclaration.
     def exitConstantDeclaration(self, ctx: smallCParser.ConstantDeclarationContext):
@@ -198,7 +216,7 @@ class customListener(smallCListener):
 
         # Enter a parse tree produced by smallCParser#constantArrayList.
     def enterConstantArrayList(self, ctx: smallCParser.ConstantArrayListContext):
-        generateBranch(getRule())
+        generateBranch(getRule(), ConstantArrayListNode())
 
     # Exit a parse tree produced by smallCParser#constantArrayList.
     def exitConstantArrayList(self, ctx: smallCParser.ConstantArrayListContext):
@@ -206,7 +224,7 @@ class customListener(smallCListener):
 
     # Enter a parse tree produced by smallCParser#constantAssignment.
     def enterConstantAssignment(self, ctx: smallCParser.ConstantAssignmentContext):
-        generateBranch(getRule())
+        generateBranch(getRule(), ConstantAssignmentNode())
 
     # Exit a parse tree produced by smallCParser#constantAssignment.
     def exitConstantAssignment(self, ctx: smallCParser.ConstantAssignmentContext):
@@ -214,7 +232,7 @@ class customListener(smallCListener):
 
     # Enter a parse tree produced by smallCParser#constantExpression.
     def enterConstantExpression(self, ctx: smallCParser.ConstantExpressionContext):
-        generateBranch(getRule())
+        generateBranch(getRule(), ConstantExpressionNode())
 
     # Exit a parse tree produced by smallCParser#constantExpression.
     def exitConstantExpression(self, ctx: smallCParser.ConstantExpressionContext):
@@ -222,7 +240,7 @@ class customListener(smallCListener):
 
     # Enter a parse tree produced by smallCParser#constantSum.
     def enterConstantSum(self, ctx: smallCParser.ConstantSumContext):
-        generateBranch(getRule())
+        generateBranch(getRule(), ConstantSumNode())
 
     # Exit a parse tree produced by smallCParser#constantSum.
     def exitConstantSum(self, ctx: smallCParser.ConstantSumContext):
@@ -230,7 +248,7 @@ class customListener(smallCListener):
 
     # Enter a parse tree produced by smallCParser#constantProduct.
     def enterConstantProduct(self, ctx: smallCParser.ConstantProductContext):
-        generateBranch(getRule())
+        generateBranch(getRule(), ConstantProductNode())
 
     # Exit a parse tree produced by smallCParser#constantProduct.
     def exitConstantProduct(self, ctx: smallCParser.ConstantProductContext):
@@ -238,7 +256,7 @@ class customListener(smallCListener):
 
     # Enter a parse tree produced by smallCParser#constant.
     def enterConstant(self, ctx: smallCParser.ConstantContext):
-        generateBranch(getRule())
+        generateBranch(getRule(), ConstantNode())
 
     # Exit a parse tree produced by smallCParser#constant.
     def exitConstant(self, ctx: smallCParser.ConstantContext):
@@ -247,7 +265,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#arrayList.
     def enterArrayList(self, ctx:smallCParser.ArrayListContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), ArrayListNode())
 
     # Exit a parse tree produced by smallCParser#arrayList.
     def exitArrayList(self, ctx:smallCParser.ArrayListContext):
@@ -258,7 +276,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#functionDeclaration.
     def enterFunctionDeclaration(self, ctx:smallCParser.FunctionDeclarationContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), FunctionDeclarationNode())
 
     # Exit a parse tree produced by smallCParser#functionDeclaration.
     def exitFunctionDeclaration(self, ctx:smallCParser.FunctionDeclarationContext):
@@ -269,7 +287,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#argumentDeclarationList.
     def enterArgumentDeclarationList(self, ctx:smallCParser.ArgumentDeclarationListContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), ArgumentDeclarationListNode())
 
     # Exit a parse tree produced by smallCParser#argumentDeclarationList.
     def exitArgumentDeclarationList(self, ctx:smallCParser.ArgumentDeclarationListContext):
@@ -280,7 +298,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#functionDefinition.
     def enterFunctionDefinition(self, ctx:smallCParser.FunctionDefinitionContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), FunctionDefinitionNode())
 
     # Exit a parse tree produced by smallCParser#functionDefinition.
     def exitFunctionDefinition(self, ctx:smallCParser.FunctionDefinitionContext):
@@ -291,7 +309,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#returnType.
     def enterReturnType(self, ctx:smallCParser.ReturnTypeContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), ReturnTypeNode())
 
     # Exit a parse tree produced by smallCParser#returnType.
     def exitReturnType(self, ctx:smallCParser.ReturnTypeContext):
@@ -302,7 +320,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#arrayElement.
     def enterArrayElement(self, ctx:smallCParser.ArrayElementContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), ArrayElementNode())
 
     # Exit a parse tree produced by smallCParser#arrayElement.
     def exitArrayElement(self, ctx:smallCParser.ArrayElementContext):
@@ -313,7 +331,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#assignment.
     def enterAssignment(self, ctx:smallCParser.AssignmentContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), AssignmentNode())
 
     # Exit a parse tree produced by smallCParser#assignment.
     def exitAssignment(self, ctx:smallCParser.AssignmentContext):
@@ -324,7 +342,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#intValue.
     def enterIntValue(self, ctx:smallCParser.IntValueContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), IntValueNode())
 
     # Exit a parse tree produced by smallCParser#intValue.
     def exitIntValue(self, ctx:smallCParser.IntValueContext):
@@ -335,7 +353,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#floatValue.
     def enterFloatValue(self, ctx:smallCParser.FloatValueContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), FloatValueNode())
 
     # Exit a parse tree produced by smallCParser#floatValue.
     def exitFloatValue(self, ctx:smallCParser.FloatValueContext):
@@ -346,7 +364,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#charValue.
     def enterCharValue(self, ctx:smallCParser.CharValueContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), CharValueNode())
 
     # Exit a parse tree produced by smallCParser#charValue.
     def exitCharValue(self, ctx:smallCParser.CharValueContext):
@@ -357,7 +375,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#functionCall.
     def enterFunctionCall(self, ctx:smallCParser.FunctionCallContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), FunctionCallNode())
 
     # Exit a parse tree produced by smallCParser#functionCall.
     def exitFunctionCall(self, ctx:smallCParser.FunctionCallContext):
@@ -368,7 +386,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#argumentList.
     def enterArgumentList(self, ctx:smallCParser.ArgumentListContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), ArrayListNode())
 
     # Exit a parse tree produced by smallCParser#argumentList.
     def exitArgumentList(self, ctx:smallCParser.ArgumentListContext):
@@ -379,7 +397,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#comparator.
     def enterComparator(self, ctx:smallCParser.ComparatorContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), ComparatorNode())
 
     # Exit a parse tree produced by smallCParser#comparator.
     def exitComparator(self, ctx:smallCParser.ComparatorContext):
@@ -390,7 +408,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#operand.
     def enterOperand(self, ctx:smallCParser.OperandContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), OperandNode())
 
     # Exit a parse tree produced by smallCParser#operand.
     def exitOperand(self, ctx:smallCParser.OperandContext):
@@ -401,7 +419,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#sumOperation.
     def enterSumOperation(self, ctx:smallCParser.SumOperationContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), SumOperationNode())
 
     # Exit a parse tree produced by smallCParser#sumOperation.
     def exitSumOperation(self, ctx:smallCParser.SumOperationContext):
@@ -412,7 +430,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#productOperation.
     def enterProductOperation(self, ctx:smallCParser.ProductOperationContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), ProductOperationNode())
 
     # Exit a parse tree produced by smallCParser#productOperation.
     def exitProductOperation(self, ctx:smallCParser.ProductOperationContext):
@@ -423,7 +441,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#operation.
     def enterOperation(self, ctx:smallCParser.OperationContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), OperationNode())
 
     # Exit a parse tree produced by smallCParser#operation.
     def exitOperation(self, ctx:smallCParser.OperationContext):
@@ -433,7 +451,7 @@ class customListener(smallCListener):
     # Enter a parse tree produced by smallCParser#identifier.
     def enterIdentifier(self, ctx:smallCParser.IdentifierContext):
         #print("Enter: ", getRule(), ctx.getText())
-        generateBranch(getRule())
+        generateBranch(getRule(), IdentifierNode())
 
     # Exit a parse tree produced by smallCParser#identifier.
     def exitIdentifier(self, ctx:smallCParser.IdentifierContext):
