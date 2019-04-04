@@ -8,6 +8,7 @@ int main(){
     char char_test;
     float float_test;
     ;;
+    int variable_test;
     variable_test;
     int*** pointer_test;
     +1;

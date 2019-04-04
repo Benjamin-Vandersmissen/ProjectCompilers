@@ -66,6 +66,7 @@ def popStack(context):
     if len(stack) == 0:
         file.write('\n}')
         print(parent.text())
+        parent.buildSymbolTable()
     elif pair != stack[-1]:
         parent = parent.parent
 

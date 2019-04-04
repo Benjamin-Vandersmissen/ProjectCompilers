@@ -1,4 +1,11 @@
+typename = None
+
+symbolTables = list()
+
 class TreeNode:
+    def text(self):
+        pass
+
     def __init__(self):
         self.parent = None
         self.children = []
@@ -7,120 +14,183 @@ class TreeNode:
         self.children.append(treenode)
         self.children[-1].parent = self
 
+
+class SymbolTableNode(TreeNode):
+    def __init__(self):
+        TreeNode.__init__(self)
+        self.symbolTable = dict()
+
+    def addSymbol(self, typename, identifier):
+        self.symbolTable[identifier] = typename
+
+    def exists(self, identifier):
+        found = identifier in self.symbolTable
+
+        if not found and self.parent is not None:
+            return self.parent.exists(identifier)
+
+        return found
+class ASTNode(TreeNode):
+
+    def __init__(self):
+        TreeNode.__init__(self)
+        self.symbolTable = None
+
     def text(self):
         string = str()
         for child in self.children:
             string += child.text()
         return string
 
-class ProgramNode(TreeNode):
+    def buildSymbolTable(self):
+        self.startDFS()
+        for child in self.children:
+            child.buildSymbolTable()
+
+        self.endDFS()
+
+    def startDFS(self):
+        #function for overriding in subclasses
+        pass
+
+    def endDFS(self):
+        pass
+
+
+class ProgramNode(ASTNode):
+    def startDFS(self):
+        global symbolTables
+        symbolTables.append(SymbolTableNode())
+        #TODO: add standaard shit in symboltable
+
+    def endDFS(self):
+        self.symbolTable = symbolTables.pop()
+
+class CodeBodyNode(ASTNode):
+    def startDFS(self):
+        #build a new symbol table
+        global symbolTables
+        newSymbolTable = SymbolTableNode()
+        symbolTables[-1].add(newSymbolTable)
+        symbolTables.append(newSymbolTable)
+
+    def endDFS(self):
+        #symbol table is finished, pop from stack
+        self.symbolTable = symbolTables.pop()
+
+class StatementNode(ASTNode):
     pass
 
-class CodeBodyNode(TreeNode):
+class IfBlockNode(ASTNode):
     pass
 
-class StatementNode(TreeNode):
+class ElseBlockNode(ASTNode):
     pass
 
-class IfBlockNode(TreeNode):
+class IfStatementNode(ASTNode):
     pass
 
-class ElseBlockNode(TreeNode):
+class WhileStatementNode(ASTNode):
     pass
 
-class IfStatementNode(TreeNode):
+class WhileBlockNode(ASTNode):
     pass
 
-class WhileStatementNode(TreeNode):
+class TypeNameNode(ASTNode):
+    def startDFS(self):
+        global typename
+        typename = self.children[0].text()
+
+class DeclarationNode(ASTNode):
     pass
 
-class WhileBlockNode(TreeNode):
+class ConstantDeclarationNode(ASTNode):
     pass
 
-class TypeNameNode(TreeNode):
+class ConstantArrayListNode(ASTNode):
     pass
 
-class DeclarationNode(TreeNode):
+class ConstantAssignmentNode(ASTNode):
     pass
 
-class ConstantDeclarationNode(TreeNode):
+class ConstantExpressionNode(ASTNode):
     pass
 
-class ConstantArrayListNode(TreeNode):
+class ConstantSumNode(ASTNode):
     pass
 
-class ConstantAssignmentNode(TreeNode):
+class ConstantProductNode(ASTNode):
     pass
 
-class ConstantExpressionNode(TreeNode):
+class ConstantNode(ASTNode):
     pass
 
-class ConstantSumNode(TreeNode):
+class ArrayListNode(ASTNode):
     pass
 
-class ConstantProductNode(TreeNode):
+class FunctionDeclarationNode(ASTNode):
     pass
 
-class ConstantNode(TreeNode):
+class ArgumentDeclarationListNode(ASTNode):
     pass
 
-class ArrayListNode(TreeNode):
+class FunctionDefinitionNode(ASTNode):
     pass
 
-class FunctionDeclarationNode(TreeNode):
+class ReturnTypeNode(ASTNode):
     pass
 
-class ArgumentDeclarationListNode(TreeNode):
+class ArrayElementNode(ASTNode):
     pass
 
-class FunctionDefinitionNode(TreeNode):
+class AssignmentNode(ASTNode):
     pass
 
-class ReturnTypeNode(TreeNode):
+class IntValueNode(ASTNode):
     pass
 
-class ArrayElementNode(TreeNode):
+class FloatValueNode(ASTNode):
     pass
 
-class AssignmentNode(TreeNode):
+class CharValueNode(ASTNode):
     pass
 
-class IntValueNode(TreeNode):
+class FunctionCallNode(ASTNode):
     pass
 
-class FloatValueNode(TreeNode):
+class ArgumentListNode(ASTNode):
     pass
 
-class CharValueNode(TreeNode):
+class ComparatorNode(ASTNode):
     pass
 
-class FunctionCallNode(TreeNode):
+class OperandNode(ASTNode):
     pass
 
-class ArgumentListNode(TreeNode):
+class SumOperationNode(ASTNode):
     pass
 
-class ComparatorNode(TreeNode):
+class ProductOperationNode(ASTNode):
     pass
 
-class OperandNode(TreeNode):
+class OperationNode(ASTNode):
     pass
 
-class SumOperationNode(TreeNode):
-    pass
+class IdentifierNode(ASTNode):
+    def startDFS(self):
+        global typename
+        identifier = self.children[0].text()
+        if typename is not None:
+            symbolTables[-1].addSymbol(typename, identifier)
+            typename = None
+        else:
+            if not symbolTables[-1].exists(identifier):
+                print(symbolTables[-1].symbolTable)
+                raise Exception("Identifier " + identifier + " not found")
 
-class ProductOperationNode(TreeNode):
-    pass
-
-class OperationNode(TreeNode):
-    pass
-
-class IdentifierNode(TreeNode):
-    pass
-
-class TokenNode(TreeNode):
+class TokenNode(ASTNode):
     def __init__(self, token):
-        TreeNode.__init__(self)
+        ASTNode.__init__(self)
         self.token = token
 
     def text(self):
