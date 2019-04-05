@@ -35,6 +35,10 @@ class ASTNode(TreeNode):
     def __init__(self):
         TreeNode.__init__(self)
         self.symbolTable = None
+        self.id = 0
+
+    def name(self):
+        return self.__class__.__name__
 
     def text(self):
         string = str()
@@ -56,6 +60,16 @@ class ASTNode(TreeNode):
     def endDFS(self):
         pass
 
+
+    def toDot(self, file):
+        if self.parent is None:
+            file.write("digraph AST {\n")
+        elif len(self.children) != 0:
+            file.write('\t"' + self.parent.name() + '_' + str(self.parent.id) + '" -> "' + self.name() + '_' + str(self.id) + '";\n')
+        for child in self.children:
+            child.toDot(file)
+        if self.parent is None:
+            file.write("}")
 
 class ProgramNode(ASTNode):
     def startDFS(self):

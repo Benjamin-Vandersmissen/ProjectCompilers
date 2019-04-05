@@ -16,6 +16,9 @@ def main(argv):
     walker.walk(listener, tree)
     parser.addParseListener(listener)
 
+    file = open("AST.dot", "w")
+    listener.AST.toDot(file)
+
 
 if __name__ == '__main__':
     main(sys.argv)
