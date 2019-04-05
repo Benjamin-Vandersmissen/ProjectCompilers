@@ -1,146 +1,86 @@
 grammar smallC;
 
-start
-        : program
+program
+        : globalDeclaration? EOF
         ;
 
-program
-        : program constantDeclaration SEMICOLON
-        | program functionDeclaration SEMICOLON
-        | program functionDefinition
-        | program INCLUDE_STDIO
-        | constantDeclaration SEMICOLON
-        | functionDeclaration SEMICOLON
-        | functionDefinition
-        | INCLUDE_STDIO
-        | 
+globalDeclaration
+        : (functionDeclaration|constantDeclaration)? SEMICOLON globalDeclaration?
+        | functionDefinition globalDeclaration?
+        | INCLUDE_STDIO globalDeclaration?
         ;
 
 codeBody
-        : codeBody SEMICOLON
-        | statement SEMICOLON
-        | codeBody statement SEMICOLON
-        | codeBody SINGLE_LINE_COMMENT
-        | codeBody ifBlock
-        | codeBody ifBlock elseBlock
-        | codeBody whileBlock
-        |
+        : OPEN_CURLY ((statement? SEMICOLON|ifStatement elseStatement?|whileStatement))* CLOSE_CURLY
         ;
 
-statement 
-        : declaration
-        | assignment
-        | operation
-        | RETURN operation
+statement
+        : assignment
+        | declaration
+        | expression
+        | RETURN (assignment|expression)?
         ;
 
-ifBlock
-        : ifStatement statement SEMICOLON
-        | ifStatement OPEN_CURLY CLOSE_CURLY
-        | ifStatement OPEN_CURLY codeBody CLOSE_CURLY
+constantExpression
+        : constantExpression (STAR|FORWARD_SLASH) constantExpression
+        | constantExpression (PLUS|MINUS) constantExpression
+        | constantExpression comparator constantExpression
+        | constant
         ;
 
-elseBlock
-        : ELSE statement SEMICOLON
-        | ELSE OPEN_CURLY CLOSE_CURLY
-        | ELSE OPEN_CURLY codeBody CLOSE_CURLY
+expression
+        : expression (STAR|FORWARD_SLASH) expression
+        | expression (PLUS|MINUS) expression
+        | expression comparator expression
+        | operand
         ;
 
 ifStatement
-        : IF OPEN_BRACKET assignment CLOSE_BRACKET
-        | IF OPEN_BRACKET operation CLOSE_BRACKET
-        | IF OPEN_BRACKET typeName assignment CLOSE_BRACKET
+        : IF OPEN_BRACKET (typeName? assignment|expression) CLOSE_BRACKET (statement SEMICOLON|codeBody)
+        ;
+
+elseStatement
+        : ELSE (statement SEMICOLON|codeBody)
         ;
         
 whileStatement
-        : WHILE OPEN_BRACKET operation CLOSE_BRACKET
-        | WHILE OPEN_BRACKET assignment CLOSE_BRACKET
-        | WHILE OPEN_BRACKET typeName assignment CLOSE_BRACKET
-        ;
-        
-whileBlock
-        : whileStatement statement SEMICOLON
-        | whileStatement OPEN_CURLY CLOSE_CURLY
-        | whileStatement OPEN_CURLY codeBody CLOSE_CURLY
+        : WHILE OPEN_BRACKET (expression|typeName? assignment) CLOSE_BRACKET (statement SEMICOLON|codeBody)
         ;
 
 typeName 
-        : INT_TYPE 
-        | CHAR_TYPE
-        | FLOAT_TYPE
-        | typeName STAR
+        : (INT_TYPE|CHAR_TYPE|FLOAT_TYPE) STAR*
         ;
 
 declaration
         : constantDeclaration
-        | typeName identifier
-        | typeName assignment
-        | typeName identifier OPEN_SQUARE operation CLOSE_SQUARE
-        | typeName identifier OPEN_SQUARE operation CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
-        | typeName identifier OPEN_SQUARE CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
+        | typeName identifier (ASSIGN expression)?
+        | typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList? CLOSE_CURLY
         ;
 
 constantDeclaration
         : typeName identifier
         | typeName constantAssignment
-        | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE
-        | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE ASSIGN OPEN_CURLY constantArrayList CLOSE_CURLY
-        | typeName identifier OPEN_SQUARE CLOSE_SQUARE ASSIGN OPEN_CURLY constantArrayList CLOSE_CURLY
-        ;
-
-constantArrayList
-        : arrayList COMMA constantExpression
-        | constantExpression
-        ;
-
-constantAssignment
-        : identifier ASSIGN constantExpression
-        | identifier OPEN_SQUARE constantExpression CLOSE_SQUARE ASSIGN constantExpression
-        ;
-
-constantExpression
-        : constantExpression comparator constantExpression
-        | constantSum
-        ;
-
-constantSum
-        : constantSum PLUS constantSum
-        | constantSum MINUS constantSum
-        | constantProduct
-        ;
-
-constantProduct
-        : constantProduct STAR constantProduct
-        | constantProduct FORWARD_SLASH constantProduct
-        | constant
-        ;
-
-constant
-        : intValue
-        | floatValue
-        | charValue
-        | OPEN_BRACKET constantExpression CLOSE_BRACKET
+        | typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE (ASSIGN OPEN_CURLY constantArrayList? CLOSE_CURLY)?
         ;
 
 arrayList
-        : arrayList COMMA operation
-        | operation
+        : (expression COMMA)* expression
         ;
-        
-    
-functionDeclaration
-        : returnType identifier OPEN_BRACKET argumentDeclarationList CLOSE_BRACKET
-        | returnType identifier OPEN_BRACKET CLOSE_BRACKET
+
+constantArrayList
+        : (constantExpression COMMA)* constantExpression
         ;
-        
+
 argumentDeclarationList
-        : typeName identifier
-        | typeName
-        | argumentDeclarationList COMMA typeName identifier
+        : (typeName identifier? COMMA)* typeName identifier?
+        ;
+
+functionDeclaration
+        : returnType identifier OPEN_BRACKET argumentDeclarationList? CLOSE_BRACKET
         ;
         
 functionDefinition
-        : functionDeclaration OPEN_CURLY codeBody CLOSE_CURLY
+        : functionDeclaration codeBody
         ;
         
 returnType
@@ -149,37 +89,24 @@ returnType
         ;
         
 arrayElement
-        : identifier OPEN_SQUARE operation CLOSE_SQUARE
+        : identifier OPEN_SQUARE (constantExpression|expression) CLOSE_SQUARE
         ;
-        
+
 assignment
-        : identifier ASSIGN operation
-        | arrayElement ASSIGN operation
+        : (identifier|dereference|depointer) ASSIGN expression
+        | arrayElement ASSIGN expression
         ;
 
-intValue 
-        : MINUS DIGIT
-        | PLUS DIGIT
-        | DIGIT
-        ;
-    
-floatValue 
-        : intValue
-        | intValue DOT DIGIT
-        ;
-
-charValue
-        :  ASCII_CHARACTER 
+constantAssignment
+        : identifier (OPEN_SQUARE constantExpression? CLOSE_SQUARE)? ASSIGN constantExpression
         ;
         
 functionCall
-        : identifier OPEN_BRACKET CLOSE_BRACKET
-        | identifier OPEN_BRACKET argumentList CLOSE_BRACKET
+        : identifier OPEN_BRACKET argumentList? CLOSE_BRACKET
         ;
         
 argumentList
-        : operation
-        | argumentList COMMA operation
+        : (expression COMMA)* expression
         ;
         
 comparator
@@ -190,36 +117,43 @@ comparator
 
 operand
         : identifier
-        | intValue
-        | floatValue
-        | charValue
+        | depointer
+        | dereference
+        | constant
         | functionCall
         | arrayElement
-        | OPEN_BRACKET operation CLOSE_BRACKET
-        ;
-      
-sumOperation
-        : productOperation PLUS productOperation
-        | productOperation MINUS productOperation
-        | sumOperation PLUS productOperation
-        | sumOperation MINUS productOperation
-        | productOperation
+        | OPEN_BRACKET expression CLOSE_BRACKET
         ;
 
-productOperation
-        : productOperation STAR productOperation
-        | productOperation FORWARD_SLASH productOperation
-        | operand
+constant
+        : intValue
+        | floatValue
+        | charValue
+        | OPEN_BRACKET constantExpression CLOSE_BRACKET
         ;
-
-operation
-        : constantExpression
-        | sumOperation
-        | operation comparator operation
-        ;        
 
 identifier
         : VARIABLE
+        ;
+
+intValue
+        : (MINUS|PLUS)? DIGIT
+        ;
+
+floatValue
+        : (MINUS|PLUS)? DIGIT DOT DIGIT
+        ;
+
+charValue
+        : ASCII_CHARACTER
+        ;
+
+dereference
+        : AMPERSAND VARIABLE
+        ;
+
+depointer
+        : STAR* AMPERSAND? STAR* VARIABLE  //TODO: als Brent zegt niet ondersteunen, de & eruit halen!!
         ;
 
 
@@ -242,6 +176,7 @@ ASSIGN : '=';
 MINUS : '-';
 PLUS : '+';
 STAR : '*';
+AMPERSAND: '&';
 FORWARD_SLASH : '/';
 LARGER_THAN : '>';
 SMALLER_THAN : '<';
