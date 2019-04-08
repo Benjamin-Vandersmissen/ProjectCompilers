@@ -29,7 +29,8 @@ constantExpression
         ;
 
 expression
-        : expression (STAR|FORWARD_SLASH) expression
+        : constantExpression
+        | expression (STAR|FORWARD_SLASH) expression
         | expression (PLUS|MINUS) expression
         | expression comparator expression
         | operand

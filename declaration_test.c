@@ -12,10 +12,10 @@ int main(){
     variable_test;
     int*** pointer_test;
     int* a = &b;
-    q = &c;
+    int q = &c;
     *a = 1;
     ***a = i;
-    &***a = 1;
+    ***a = 1;
     **&***b = 2;
     +1;
     -1;

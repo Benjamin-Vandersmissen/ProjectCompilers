@@ -30,6 +30,19 @@ class SymbolTableNode(TreeNode):
             return self.parent.exists(identifier)
 
         return found
+
+    def dotRepresentation(self):
+        representation = 'symboltable" [shape="plaintext" label=< <table>\n'
+
+        representation += "<th><td><b>identifier</b></td><td><b>type</b></td></th>"
+
+        for key, value in self.symbolTable.items():
+            representation += '\n<tr><td>' + key + '</td><td>' + value + '</td></tr>'
+
+        representation += '</table>>];\n'
+
+        return representation
+
 class ASTNode(TreeNode):
 
     def __init__(self):
@@ -38,7 +51,7 @@ class ASTNode(TreeNode):
         self.id = 0
 
     def name(self):
-        return self.__class__.__name__
+        return self.__class__.__name__.split('Node')[0]
 
     def text(self):
         string = str()
@@ -64,12 +77,24 @@ class ASTNode(TreeNode):
     def toDot(self, file):
         if self.parent is None:
             file.write("digraph AST {\n")
-        elif len(self.children) != 0:
+            file.write('\t"' + self.name() + '_' + str(self.id) + '"[label="'+self.name() + '"];\n')
+        else:
+            file.write('\t"' + self.name() + '_' + str(self.id) + '"[label="'+self.name() + '"];\n')
             file.write('\t"' + self.parent.name() + '_' + str(self.parent.id) + '" -> "' + self.name() + '_' + str(self.id) + '";\n')
+
+        if self.symbolTable:
+            file.write('\t"' + self.name() + '_' + str(self.id) + '_' + self.symbolTable.dotRepresentation())
+            file.write('\t"' + self.name() + '_' + str(self.id) + '"->"' + self.name() + '_' + str(self.id) +
+                       '_symboltable" [style="dotted"];\n')
+
         for child in self.children:
             child.toDot(file)
         if self.parent is None:
             file.write("}")
+
+    def processToken(self, token):
+        # empty function to be overridden in derived classes
+        pass
 
 class ProgramNode(ASTNode):
     def startDFS(self):
@@ -95,10 +120,13 @@ class CodeBodyNode(ASTNode):
 class StatementNode(ASTNode):
     pass
 
-class IfBlockNode(ASTNode):
+class DereferenceNode(ASTNode):
     pass
 
-class ElseBlockNode(ASTNode):
+class DepointerNode(ASTNode):
+    pass
+
+class ElseStatementNode(ASTNode):
     pass
 
 class IfStatementNode(ASTNode):
@@ -111,9 +139,17 @@ class WhileBlockNode(ASTNode):
     pass
 
 class TypeNameNode(ASTNode):
+
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.typename = ''
+
+    def processToken(self, token):
+        self.typename += token
+
     def startDFS(self):
         global typename
-        typename = self.children[0].text()
+        typename = self.typename
 
 class DeclarationNode(ASTNode):
     pass
@@ -161,13 +197,28 @@ class AssignmentNode(ASTNode):
     pass
 
 class IntValueNode(ASTNode):
-    pass
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.value = None
+
+    def processToken(self, token):
+        self.value = int(token)
 
 class FloatValueNode(ASTNode):
-    pass
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.value = None
+
+    def processToken(self, token):
+        self.value = float(token)
 
 class CharValueNode(ASTNode):
-    pass
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.value = None
+
+    def processToken(self, token):
+        self.value = token
 
 class FunctionCallNode(ASTNode):
     pass
@@ -187,20 +238,32 @@ class SumOperationNode(ASTNode):
 class ProductOperationNode(ASTNode):
     pass
 
-class OperationNode(ASTNode):
-    pass
+class ExpressionNode(ASTNode):
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.operators = []
+
+    def processToken(self, token):
+        self.operators.append(token)
 
 class IdentifierNode(ASTNode):
+
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.identifier = ''
+
+    def processToken(self, token):
+        self.identifier = token
+
     def startDFS(self):
         global typename
-        identifier = self.children[0].text()
         if typename is not None:
-            symbolTables[-1].addSymbol(typename, identifier)
+            symbolTables[-1].addSymbol(typename, self.identifier)
             typename = None
         else:
-            if not symbolTables[-1].exists(identifier):
+            if not symbolTables[-1].exists(self.identifier):
                 print(symbolTables[-1].symbolTable)
-                raise Exception("Identifier " + identifier + " not found")
+                raise Exception("Identifier " + self.identifier + " not found")
 
 class TokenNode(ASTNode):
     def __init__(self, token):
