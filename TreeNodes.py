@@ -40,17 +40,55 @@ class SymbolTableNode(TreeNode):
             representation += '\n<tr><td>' + key + '</td><td>' + value + '</td></tr>'
 
         representation += '</table>>];\n'
-
         return representation
 
     def getEntry(self, index):
         return list(self.symbolTable.items())[index]
+
+class FunctionTableNode(TreeNode):
+    def __init__(self):
+        TreeNode.__init__(self)
+        self.functionTable = dict()
+
+    def addFunction(self, returnType, identifier, arguments, defined=False):
+        self.functionTable[identifier] = (returnType, arguments, defined)
+
+    def exists(self, identifier):
+        found = identifier in self.functionTable
+
+        if not found and self.parent is not None:
+            return self.parent.exists(identifier)
+
+        return found
+
+    def dotRepresentation(self):
+        representation = 'functiontable" [shape="plaintext" label=< <table>\n'
+
+        representation += "<th><td><b>identifier</b></td><td><b>returnType</b></td>" \
+                          "<td><b>arguments</b></td><td><b>defined</b></td></th>"
+
+        for key, value in self.functionTable.items():
+            representation += '\n<tr><td>' + key + '</td><td>' + value[0] + '</td>'
+
+            arguments = ''
+            for argument in value[1]:
+                arguments += argument + ', '
+            if len(arguments) > 2 and arguments[-2] == ',':
+                arguments = arguments[:-2]
+
+            representation += '<td>' + arguments + '</td><td>' + str(value[2]) + '</td></tr>'
+
+        representation += '</table>>];\n'
+        return representation
+
+functionTable = FunctionTableNode()
 
 class ASTNode(TreeNode):
 
     def __init__(self):
         TreeNode.__init__(self)
         self.symbolTable = None
+        self.functionTable = None
         self.id = 0
 
     def name(self):
@@ -102,6 +140,11 @@ class ASTNode(TreeNode):
             file.write('\t"' + self.name() + '_' + str(self.id) + '"->"' + self.name() + '_' + str(self.id) +
                        '_symboltable" [style="dotted"];\n')
 
+        if self.functionTable:
+            file.write('\t"' + self.name() + '_' + str(self.id) + '_' + self.functionTable.dotRepresentation())
+            file.write('\t"' + self.name() + '_' + str(self.id) + '"->"' + self.name() + '_' + str(self.id) +
+                       '_functiontable" [style="dotted"];\n')
+
         for child in self.children:
             child.toDot(file)
         if self.parent is None:
@@ -118,7 +161,9 @@ class ProgramNode(ASTNode):
         #TODO: add standaard shit in symboltable
 
     def endDFS(self):
+        global symbolTables, functionTable
         self.symbolTable = symbolTables.pop()
+        self.functionTable = functionTable
 
 class CodeBodyNode(ASTNode):
     def startDFS(self):
@@ -210,7 +255,34 @@ class ArrayListNode(ASTNode):
     pass
 
 class FunctionDeclarationNode(ASTNode):
-    pass
+    def startDFS(self):
+        # build a new symbol table
+        global symbolTables
+        newSymbolTable = SymbolTableNode()
+        symbolTables[-1].add(newSymbolTable)
+        symbolTables.append(newSymbolTable)
+
+    def endDFS(self):
+        # symbol table is finished, pop from stack
+        self.symbolTable = symbolTables.pop()
+
+        functionEntry = self.symbolTable.getEntry(0)
+
+        print(functionEntry)
+
+        symbolTables[0].addSymbol(functionEntry[1], functionEntry[0])
+
+        arguments = list()
+        for i in range(1, len(self.symbolTable.symbolTable)):
+            arguments.append(self.symbolTable.getEntry(i)[1])
+
+        functionTable.addFunction(functionEntry[1], functionEntry[0], arguments, False)
+
+        # This is a function declaration in a function definition
+        # We need to push all symbolTable entries back a level
+        if len(symbolTables) > 1:
+            symbolTables[-1] = self.symbolTable
+        self.symbolTable = None
 
 class ArgumentDeclarationListNode(ASTNode):
     pass
@@ -232,6 +304,12 @@ class FunctionDefinitionNode(ASTNode):
         print(functionEntry)
 
         symbolTables[0].addSymbol(functionEntry[1], functionEntry[0])
+
+        arguments = list()
+        for i in range(1, len(self.symbolTable.symbolTable)):
+            arguments.append(self.symbolTable.getEntry(i)[1])
+
+        functionTable.addFunction(functionEntry[1], functionEntry[0], arguments, True)
 
 class ReturnTypeNode(TypeNameNode):
     pass
