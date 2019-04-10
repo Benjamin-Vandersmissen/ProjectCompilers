@@ -19,7 +19,11 @@ statement
         | declaration
         | constantExpression
         | expression
-        | RETURN (assignment|expression)?
+        | returnStatement
+        ;
+
+returnStatement
+        : RETURN (assignment|expression)?
         ;
 
 constantExpression
@@ -33,6 +37,7 @@ expression
         : expression (STAR|FORWARD_SLASH) expression #product
         | expression (PLUS|MINUS) expression #sum
         | expression (LARGER_THAN|SMALLER_THAN|EQUALS) expression #comparison
+        | constant #const
         | operand #value
         ;
 
@@ -113,7 +118,6 @@ argumentList
 
 operand
         : identifier
-        | constantExpression
         | depointer
         | dereference
         | constant
