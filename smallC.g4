@@ -19,7 +19,11 @@ statement
         | declaration
         | constantExpression
         | expression
-        | RETURN (assignment|expression)?
+        | returnStatement
+        ;
+
+returnStatement
+        : RETURN (assignment|expression)?
         ;
 
 constantExpression
