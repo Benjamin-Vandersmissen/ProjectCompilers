@@ -15,6 +15,8 @@ void f4( int a, int b) {
 }
 
 int main(){
+    int x = 0;
+
     int a = f(x);
 
     int b = f(f(x));

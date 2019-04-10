@@ -44,21 +44,75 @@ class smallCListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by smallCParser#constantExpression.
-    def enterConstantExpression(self, ctx:smallCParser.ConstantExpressionContext):
+    # Enter a parse tree produced by smallCParser#constantProduct.
+    def enterConstantProduct(self, ctx:smallCParser.ConstantProductContext):
         pass
 
-    # Exit a parse tree produced by smallCParser#constantExpression.
-    def exitConstantExpression(self, ctx:smallCParser.ConstantExpressionContext):
+    # Exit a parse tree produced by smallCParser#constantProduct.
+    def exitConstantProduct(self, ctx:smallCParser.ConstantProductContext):
         pass
 
 
-    # Enter a parse tree produced by smallCParser#expression.
-    def enterExpression(self, ctx:smallCParser.ExpressionContext):
+    # Enter a parse tree produced by smallCParser#constantSum.
+    def enterConstantSum(self, ctx:smallCParser.ConstantSumContext):
         pass
 
-    # Exit a parse tree produced by smallCParser#expression.
-    def exitExpression(self, ctx:smallCParser.ExpressionContext):
+    # Exit a parse tree produced by smallCParser#constantSum.
+    def exitConstantSum(self, ctx:smallCParser.ConstantSumContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constantComparison.
+    def enterConstantComparison(self, ctx:smallCParser.ConstantComparisonContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantComparison.
+    def exitConstantComparison(self, ctx:smallCParser.ConstantComparisonContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constantValue.
+    def enterConstantValue(self, ctx:smallCParser.ConstantValueContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantValue.
+    def exitConstantValue(self, ctx:smallCParser.ConstantValueContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#product.
+    def enterProduct(self, ctx:smallCParser.ProductContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#product.
+    def exitProduct(self, ctx:smallCParser.ProductContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#comparison.
+    def enterComparison(self, ctx:smallCParser.ComparisonContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#comparison.
+    def exitComparison(self, ctx:smallCParser.ComparisonContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#sum.
+    def enterSum(self, ctx:smallCParser.SumContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#sum.
+    def exitSum(self, ctx:smallCParser.SumContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#value.
+    def enterValue(self, ctx:smallCParser.ValueContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#value.
+    def exitValue(self, ctx:smallCParser.ValueContext):
         pass
 
 
@@ -212,15 +266,6 @@ class smallCListener(ParseTreeListener):
 
     # Exit a parse tree produced by smallCParser#argumentList.
     def exitArgumentList(self, ctx:smallCParser.ArgumentListContext):
-        pass
-
-
-    # Enter a parse tree produced by smallCParser#comparator.
-    def enterComparator(self, ctx:smallCParser.ComparatorContext):
-        pass
-
-    # Exit a parse tree produced by smallCParser#comparator.
-    def exitComparator(self, ctx:smallCParser.ComparatorContext):
         pass
 
 

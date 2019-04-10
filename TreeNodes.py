@@ -43,6 +43,9 @@ class SymbolTableNode(TreeNode):
 
         return representation
 
+    def getEntry(self, index):
+        return list(self.symbolTable.items())[index]
+
 class ASTNode(TreeNode):
 
     def __init__(self):
@@ -66,6 +69,15 @@ class ASTNode(TreeNode):
 
         self.endDFS()
 
+    def canMerge(self, node):
+        return isinstance(node, self.__class__)
+
+    def merge(self, node):
+        node.parent.children.remove(node)
+        for child in node.children:
+            self.add(child)
+
+
     def startDFS(self):
         #function for overriding in subclasses
         pass
@@ -74,12 +86,15 @@ class ASTNode(TreeNode):
         pass
 
 
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="'+self.name() + '"];\n'
+
     def toDot(self, file):
         if self.parent is None:
             file.write("digraph AST {\n")
-            file.write('\t"' + self.name() + '_' + str(self.id) + '"[label="'+self.name() + '"];\n')
+            file.write(self.dotRepresentation())
         else:
-            file.write('\t"' + self.name() + '_' + str(self.id) + '"[label="'+self.name() + '"];\n')
+            file.write(self.dotRepresentation())
             file.write('\t"' + self.parent.name() + '_' + str(self.parent.id) + '" -> "' + self.name() + '_' + str(self.id) + '";\n')
 
         if self.symbolTable:
@@ -121,10 +136,26 @@ class StatementNode(ASTNode):
     pass
 
 class DereferenceNode(ASTNode):
-    pass
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.dereference = ''
+
+    def processToken(self, token):
+        self.dereference += token
+
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.dereference + '"];\n'
 
 class DepointerNode(ASTNode):
-    pass
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.depointer = ''
+
+    def processToken(self, token):
+        self.depointer += token
+
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.depointer + '"];\n'
 
 class ElseStatementNode(ASTNode):
     pass
@@ -151,6 +182,9 @@ class TypeNameNode(ASTNode):
         global typename
         typename = self.typename
 
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.typename + '"];\n'
+
 class DeclarationNode(ASTNode):
     pass
 
@@ -166,10 +200,7 @@ class ConstantAssignmentNode(ASTNode):
 class ConstantExpressionNode(ASTNode):
     pass
 
-class ConstantSumNode(ASTNode):
-    pass
-
-class ConstantProductNode(ASTNode):
+class ConstantValueNode(ASTNode):
     pass
 
 class ConstantNode(ASTNode):
@@ -185,9 +216,24 @@ class ArgumentDeclarationListNode(ASTNode):
     pass
 
 class FunctionDefinitionNode(ASTNode):
-    pass
+    def startDFS(self):
+        # build a new symbol table
+        global symbolTables
+        newSymbolTable = SymbolTableNode()
+        symbolTables[-1].add(newSymbolTable)
+        symbolTables.append(newSymbolTable)
 
-class ReturnTypeNode(ASTNode):
+    def endDFS(self):
+        # symbol table is finished, pop from stack
+        self.symbolTable = symbolTables.pop()
+
+        functionEntry = self.symbolTable.getEntry(0)
+
+        print(functionEntry)
+
+        symbolTables[0].addSymbol(functionEntry[1], functionEntry[0])
+
+class ReturnTypeNode(TypeNameNode):
     pass
 
 class ArrayElementNode(ASTNode):
@@ -196,26 +242,61 @@ class ArrayElementNode(ASTNode):
 class AssignmentNode(ASTNode):
     pass
 
-class IntValueNode(ASTNode):
+class ValueNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
         self.value = None
 
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + str(self.value) + '"];\n'
+
+
+class IntValueNode(ValueNode):
+
+    def __init__(self):
+        ValueNode.__init__(self)
+        self.sign = 1
+
     def processToken(self, token):
+        if token == '+':
+            return
+        elif token == '-':
+            self.sign *= -1
+            return
         self.value = int(token)
 
-class FloatValueNode(ASTNode):
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + \
+               ('-' if self.sign < 0 else '') + str(self.value) + '"];\n'
+
+class FloatValueNode(ValueNode):
+
     def __init__(self):
-        ASTNode.__init__(self)
-        self.value = None
+        ValueNode.__init__(self)
+        self.sign = 1
+        self.integer = None
+        self.fraction = None
 
     def processToken(self, token):
-        self.value = float(token)
+        if token == '+':
+            return
+        elif token == '-':
+            self.sign *= -1
+            return
+        elif token == '.':
+            return
 
-class CharValueNode(ASTNode):
-    def __init__(self):
-        ASTNode.__init__(self)
-        self.value = None
+        if self.integer is None:
+            self.integer = int(token)
+        else:
+            self.fraction = int(token)
+            self.value = float(str(self.integer)+'.'+str(self.fraction))
+
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + \
+               ('-' if self.sign < 0 else '') + str(self.value) + '"];\n'
+
+class CharValueNode(ValueNode):
 
     def processToken(self, token):
         self.value = token
@@ -226,25 +307,40 @@ class FunctionCallNode(ASTNode):
 class ArgumentListNode(ASTNode):
     pass
 
-class ComparatorNode(ASTNode):
-    pass
-
 class OperandNode(ASTNode):
     pass
 
-class SumOperationNode(ASTNode):
-    pass
-
-class ProductOperationNode(ASTNode):
-    pass
-
-class ExpressionNode(ASTNode):
+class OperationNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
-        self.operators = []
+        self.operator = None
 
     def processToken(self, token):
-        self.operators.append(token)
+        self.operator = token
+
+    def canMerge(self, node):
+        return ASTNode.canMerge(self, node) and node.operator == self.operator
+
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.operator + '"];\n'
+
+class SumNode(OperationNode):
+    pass
+
+class ProductNode(OperationNode):
+    pass
+
+class ComparisonNode(OperationNode):
+    pass
+
+class ConstantComparisonNode(OperationNode):
+    pass
+
+class ConstantSumNode(OperationNode):
+    pass
+
+class ConstantProductNode(OperationNode):
+    pass
 
 class IdentifierNode(ASTNode):
 
@@ -254,6 +350,9 @@ class IdentifierNode(ASTNode):
 
     def processToken(self, token):
         self.identifier = token
+
+    def dotRepresentation(self):
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.identifier + '"];\n'
 
     def startDFS(self):
         global typename
@@ -265,10 +364,3 @@ class IdentifierNode(ASTNode):
                 print(symbolTables[-1].symbolTable)
                 raise Exception("Identifier " + self.identifier + " not found")
 
-class TokenNode(ASTNode):
-    def __init__(self, token):
-        ASTNode.__init__(self)
-        self.token = token
-
-    def text(self):
-        return str(self.token)

@@ -29,13 +29,43 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by smallCParser#constantExpression.
-    def visitConstantExpression(self, ctx:smallCParser.ConstantExpressionContext):
+    # Visit a parse tree produced by smallCParser#constantProduct.
+    def visitConstantProduct(self, ctx:smallCParser.ConstantProductContext):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by smallCParser#expression.
-    def visitExpression(self, ctx:smallCParser.ExpressionContext):
+    # Visit a parse tree produced by smallCParser#constantSum.
+    def visitConstantSum(self, ctx:smallCParser.ConstantSumContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constantComparison.
+    def visitConstantComparison(self, ctx:smallCParser.ConstantComparisonContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constantValue.
+    def visitConstantValue(self, ctx:smallCParser.ConstantValueContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#product.
+    def visitProduct(self, ctx:smallCParser.ProductContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#comparison.
+    def visitComparison(self, ctx:smallCParser.ComparisonContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#sum.
+    def visitSum(self, ctx:smallCParser.SumContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#value.
+    def visitValue(self, ctx:smallCParser.ValueContext):
         return self.visitChildren(ctx)
 
 
@@ -121,11 +151,6 @@ class smallCVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by smallCParser#argumentList.
     def visitArgumentList(self, ctx:smallCParser.ArgumentListContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by smallCParser#comparator.
-    def visitComparator(self, ctx:smallCParser.ComparatorContext):
         return self.visitChildren(ctx)
 
 

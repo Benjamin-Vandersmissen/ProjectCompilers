@@ -1,9 +1,11 @@
 import sys
+
 from antlr4 import *
+
+from customListener import customListener
 from smallCLexer import smallCLexer
 from smallCParser import smallCParser
-from smallCVisitor import smallCVisitor
-from customListener import customListener
+
 
 def main(argv):
     text = FileStream(argv[1])
@@ -17,6 +19,7 @@ def main(argv):
     parser.addParseListener(listener)
 
     file = open("AST.dot", "w")
+    listener.AST.buildSymbolTable()
     listener.AST.toDot(file)
 
 

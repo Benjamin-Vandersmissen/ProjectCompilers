@@ -17,23 +17,23 @@ codeBody
 statement
         : assignment
         | declaration
+        | constantExpression
         | expression
         | RETURN (assignment|expression)?
         ;
 
 constantExpression
-        : constantExpression (STAR|FORWARD_SLASH) constantExpression
-        | constantExpression (PLUS|MINUS) constantExpression
-        | constantExpression comparator constantExpression
-        | constant
+        : constantExpression (STAR|FORWARD_SLASH) constantExpression #constantProduct
+        | constantExpression (PLUS|MINUS) constantExpression #constantSum
+        | constantExpression (LARGER_THAN|SMALLER_THAN|EQUALS) constantExpression #constantComparison
+        | constant #constantValue
         ;
 
 expression
-        : constantExpression
-        | expression (STAR|FORWARD_SLASH) expression
-        | expression (PLUS|MINUS) expression
-        | expression comparator expression
-        | operand
+        : expression (STAR|FORWARD_SLASH) expression #product
+        | expression (PLUS|MINUS) expression #sum
+        | expression (LARGER_THAN|SMALLER_THAN|EQUALS) expression #comparison
+        | operand #value
         ;
 
 ifStatement
@@ -109,15 +109,11 @@ functionCall
 argumentList
         : (expression COMMA)* expression
         ;
-        
-comparator
-        : LARGER_THAN
-        | SMALLER_THAN
-        | EQUALS
-        ;
+
 
 operand
         : identifier
+        | constantExpression
         | depointer
         | dereference
         | constant
