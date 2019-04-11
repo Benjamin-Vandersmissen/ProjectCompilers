@@ -174,6 +174,9 @@ class ASTNode(TreeNode):
         # empty function to be overridden in derived classes
         pass
 
+    def throwError(self, text):
+        raise Exception("({}:{}) : ".format(self.line, self.column) + text)
+
 class ProgramNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
@@ -270,8 +273,7 @@ class DeclarationNode(ASTNode):
         typename = self.children[0].typename
         identifier = self.children[1].identifier
         if identifier in reservedWords:
-            raise Exception("Invalid usage of reserved keyword " + identifier + " as identifier at "
-                            + str(self.line)+":"+str(self.column))
+            self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
 class ArrayDeclarationNode(ASTNode):
@@ -292,8 +294,7 @@ class ArrayDeclarationNode(ASTNode):
         typename = typename + '[' + str(size) + ']'
 
         if identifier in reservedWords:
-            raise Exception("Invalid usage of reserved keyword " + identifier + " as identifier at "
-                            + str(self.line)+":"+str(self.column))
+            self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
 
@@ -305,8 +306,7 @@ class ConstantDeclarationNode(DeclarationNode):
         else:
             identifier = self.children[1].children[0].identifier
         if identifier in reservedWords:
-            raise Exception("Invalid usage of reserved keyword " + identifier + " as identifier at "
-                            + str(self.line)+":"+str(self.column))
+            self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
 class ConstantArrayDeclarationNode(ArrayDeclarationNode):
@@ -348,7 +348,7 @@ class FunctionDeclarationNode(ASTNode):
                 arguments.append(argumentType)
 
         if functionTable.exists(identifier) and not functionTable.signatureExists(typename, identifier, arguments):
-            raise Exception("function " + identifier + " is redeclared at "+str(self.line)+":"+str(self.column)+" with a different signature")
+            self.throwError("function {} is redeclared with a different signature".format(identifier))
 
         functionTable.addFunction(typename, identifier, list(), False)
 
@@ -377,8 +377,7 @@ class ArgumentDeclarationListNode(ASTNode):
             typename = self.children[i].typename
             identifier = self.children[i+1].identifier
             if identifier in reservedWords:
-                raise Exception("Invalid usage of reserved keyword " + identifier + " as identifier at "
-                                + str(self.line) + ":" + str(self.column))
+                self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
             symbolTables[-1].addSymbol(typename, identifier)
 
 class FunctionDefinitionNode(ASTNode):
@@ -388,7 +387,7 @@ class FunctionDefinitionNode(ASTNode):
         identifier = self.children[0].children[1].identifier
 
         if functionTable.isDefined(identifier):
-            raise Exception("Redefinition of function " + identifier+" at " + str(self.line)+":"+str(self.column))
+            self.throwError("Redefinition of function {}".format(identifier))
         global symbolTables
         newSymbolTable = SymbolTableNode()
         symbolTables[-1].add(newSymbolTable)
@@ -479,9 +478,24 @@ class FunctionCallNode(ASTNode):
     def startDFS(self):
         identifier = self.children[0].identifier
         if not functionTable.exists(identifier):
-            raise Exception("Identifier " + identifier + " not found at " + str(self.line)+":"+str(self.column))
+            self.throwError("Identifier {} not found".format(identifier))
         if not functionTable.isDefined(identifier):
-            raise Exception("Function " + identifier + " is not defined at " + str(self.line)+":"+str(self.column))
+            self.throwError("Function {} is not defined".format(identifier))
+
+        argumentCount = len(self.children[1].children)
+        arguments = functionTable.functionTable[identifier][1]
+
+        if argumentCount > len(arguments):
+            self.throwError("Expected {} arguments, got {}".format(len(arguments), argumentCount))
+
+        if arguments[-1] == '...':
+            # infinite arguments possible
+            if argumentCount < len(arguments) -1:
+                self.throwError("Expected at least {} arguments, got()".format(len(arguments) - 1, argumentCount))
+        else:
+            if argumentCount < len(arguments):
+                self.throwError("Expected {} arguments, got {}".format(len(arguments), argumentCount))
+
         # TODO: Typecheck each argument and add argument count check
 
 class ArgumentListNode(ASTNode):
