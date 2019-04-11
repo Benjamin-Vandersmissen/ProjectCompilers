@@ -29,6 +29,11 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by smallCParser#returnStatement.
+    def visitReturnStatement(self, ctx:smallCParser.ReturnStatementContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#constantProduct.
     def visitConstantProduct(self, ctx:smallCParser.ConstantProductContext):
         return self.visitChildren(ctx)
@@ -56,6 +61,11 @@ class smallCVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by smallCParser#comparison.
     def visitComparison(self, ctx:smallCParser.ComparisonContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#const.
+    def visitConst(self, ctx:smallCParser.ConstContext):
         return self.visitChildren(ctx)
 
 
@@ -94,8 +104,18 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by smallCParser#arrayDeclaration.
+    def visitArrayDeclaration(self, ctx:smallCParser.ArrayDeclarationContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#constantDeclaration.
     def visitConstantDeclaration(self, ctx:smallCParser.ConstantDeclarationContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by smallCParser#constantArrayDeclaration.
+    def visitConstantArrayDeclaration(self, ctx:smallCParser.ConstantArrayDeclarationContext):
         return self.visitChildren(ctx)
 
 

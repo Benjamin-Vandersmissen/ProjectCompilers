@@ -61,6 +61,12 @@ class FunctionTableNode(TreeNode):
 
         return found
 
+    def signatureExists(self, returnType, identifier, arguments):
+        if identifier in self.functionTable:
+            value = self.functionTable[identifier]
+            return returnType == value[0] and arguments == value[1]
+        return False
+
     def dotRepresentation(self):
         representation = 'functiontable" [shape="plaintext" label=< <table>\n'
 
@@ -81,6 +87,12 @@ class FunctionTableNode(TreeNode):
         representation += '</table>>];\n'
         return representation
 
+    def isDefined(self, identifier):
+        if identifier in self.functionTable:
+            return self.functionTable[identifier][2]
+        else:
+            return False
+
 functionTable = FunctionTableNode()
 
 class ASTNode(TreeNode):
@@ -90,6 +102,8 @@ class ASTNode(TreeNode):
         self.symbolTable = None
         self.functionTable = None
         self.id = 0
+        self.line = 0
+        self.column = 0
 
     def name(self):
         return self.__class__.__name__.split('Node')[0]
@@ -108,7 +122,7 @@ class ASTNode(TreeNode):
         self.endDFS()
 
     def canMerge(self, node):
-        return isinstance(node, self.__class__)
+        return node.__class__ == self.__class__
 
     def merge(self, node):
         node.parent.children.remove(node)
@@ -150,6 +164,11 @@ class ASTNode(TreeNode):
         if self.parent is None:
             file.write("}")
 
+    def toLLVM(self, file):
+        #LLVM output here
+        for child in self.children:
+            child.toLLVM(file)
+
     def processToken(self, token):
         # empty function to be overridden in derived classes
         pass
@@ -178,6 +197,9 @@ class CodeBodyNode(ASTNode):
         self.symbolTable = symbolTables.pop()
 
 class StatementNode(ASTNode):
+    pass
+
+class ReturnStatementNode(ASTNode):
     pass
 
 class DereferenceNode(ASTNode):
@@ -231,9 +253,41 @@ class TypeNameNode(ASTNode):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.typename + '"];\n'
 
 class DeclarationNode(ASTNode):
-    pass
+    def startDFS(self):
+        typename = self.children[0].typename
+        identifier = self.children[1].identifier
+        symbolTables[-1].addSymbol(typename, identifier)
 
-class ConstantDeclarationNode(ASTNode):
+class ArrayDeclarationNode(ASTNode):
+    def __init__(self):
+        ASTNode.__init__(self)
+
+    def startDFS(self):
+        typename = self.children[0].typename
+        identifier = self.children[1].identifier
+        size = ' '
+        if len(self.children) == 4:
+            size = self.children[2].value
+        if len(self.children) == 3:
+            if isinstance(self.children[2], ArrayListNode):
+                size = len(self.children[2])
+            else:
+                size = self.children[2].value
+        typename = typename + '[' + str(size) + ']'
+
+        symbolTables[-1].addSymbol(typename, identifier)
+
+
+class ConstantDeclarationNode(DeclarationNode):
+    def startDFS(self):
+        typename = self.children[0].typename
+        if isinstance(self.children[1], IdentifierNode):
+            identifier = self.children[1].identifier
+        else:
+            identifier = self.children[1].children[0].identifier
+        symbolTables[-1].addSymbol(typename, identifier)
+
+class ConstantArrayDeclarationNode(ArrayDeclarationNode):
     pass
 
 class ConstantArrayListNode(ASTNode):
@@ -262,21 +316,32 @@ class FunctionDeclarationNode(ASTNode):
         symbolTables[-1].add(newSymbolTable)
         symbolTables.append(newSymbolTable)
 
+        typename = self.children[0].typename
+        identifier = self.children[1].identifier
+
+        arguments = list()
+        if len(self.children) > 2:
+            for i in range(0, len(self.children[2].children), 2):
+                argumentType = self.children[2].children[i].typename
+                arguments.append(argumentType)
+
+        if functionTable.exists(identifier) and not functionTable.signatureExists(typename, identifier, arguments):
+            raise Exception("function " + identifier + " is redeclared at "+str(self.line)+":"+str(self.column)+" with a different signature")
+
+        functionTable.addFunction(typename, identifier, list(), False)
+
     def endDFS(self):
         # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
 
-        functionEntry = self.symbolTable.getEntry(0)
-
-        print(functionEntry)
-
-        symbolTables[0].addSymbol(functionEntry[1], functionEntry[0])
+        typename = self.children[0].typename
+        identifier = self.children[1].identifier
 
         arguments = list()
         for i in range(1, len(self.symbolTable.symbolTable)):
             arguments.append(self.symbolTable.getEntry(i)[1])
 
-        functionTable.addFunction(functionEntry[1], functionEntry[0], arguments, False)
+        functionTable.addFunction(typename, identifier, arguments, False)
 
         # This is a function declaration in a function definition
         # We need to push all symbolTable entries back a level
@@ -285,11 +350,20 @@ class FunctionDeclarationNode(ASTNode):
         self.symbolTable = None
 
 class ArgumentDeclarationListNode(ASTNode):
-    pass
+    def startDFS(self):
+        for i in range(0, len(self.children), 2):
+            typename = self.children[i].typename
+            identifier = self.children[i+1].identifier
+            symbolTables[-1].addSymbol(typename, identifier)
 
 class FunctionDefinitionNode(ASTNode):
     def startDFS(self):
         # build a new symbol table
+
+        identifier = self.children[0].children[1].identifier
+
+        if functionTable.isDefined(identifier):
+            raise Exception("Redefinition of function " + identifier+" at " + str(self.line)+":"+str(self.column))
         global symbolTables
         newSymbolTable = SymbolTableNode()
         symbolTables[-1].add(newSymbolTable)
@@ -299,17 +373,14 @@ class FunctionDefinitionNode(ASTNode):
         # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
 
-        functionEntry = self.symbolTable.getEntry(0)
-
-        print(functionEntry)
-
-        symbolTables[0].addSymbol(functionEntry[1], functionEntry[0])
+        typename = self.children[0].children[0].typename  # declaration is always first child of definition
+        identifier = self.children[0].children[1].identifier
 
         arguments = list()
-        for i in range(1, len(self.symbolTable.symbolTable)):
+        for i in range(0, len(self.symbolTable.symbolTable)):
             arguments.append(self.symbolTable.getEntry(i)[1])
 
-        functionTable.addFunction(functionEntry[1], functionEntry[0], arguments, True)
+        functionTable.addFunction(typename, identifier, arguments, True)
 
 class ReturnTypeNode(TypeNameNode):
     pass
@@ -380,7 +451,13 @@ class CharValueNode(ValueNode):
         self.value = token
 
 class FunctionCallNode(ASTNode):
-    pass
+    def startDFS(self):
+        identifier = self.children[0].identifier
+        if not functionTable.exists(identifier):
+            raise Exception("Identifier " + identifier + " not found at " + str(self.line)+":"+str(self.column))
+        if not functionTable.isDefined(identifier):
+            raise Exception("Function " + identifier + " is not defined at " + str(self.line)+":"+str(self.column))
+        # TODO: Typecheck each argument and add argument count check
 
 class ArgumentListNode(ASTNode):
     pass
@@ -433,12 +510,7 @@ class IdentifierNode(ASTNode):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.identifier + '"];\n'
 
     def startDFS(self):
-        global typename
-        if typename is not None:
-            symbolTables[-1].addSymbol(typename, self.identifier)
-            typename = None
-        else:
-            if not symbolTables[-1].exists(self.identifier):
-                print(symbolTables[-1].symbolTable)
-                raise Exception("Identifier " + self.identifier + " not found")
+        if not symbolTables[-1].exists(self.identifier) and not functionTable.exists(self.identifier):
+            print(symbolTables[-1].symbolTable)
+            raise Exception("Identifier " + self.identifier + " not found at " + str(self.line)+":"+str(self.column))
 

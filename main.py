@@ -13,6 +13,8 @@ def main(argv):
     stream = CommonTokenStream(lexer)
     parser = smallCParser(stream)
     tree = parser.program()
+    if parser._syntaxErrors > 0:
+        exit(1)
     listener = customListener()
     walker = ParseTreeWalker()
     walker.walk(listener, tree)

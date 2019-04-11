@@ -44,6 +44,15 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#returnStatement.
+    def enterReturnStatement(self, ctx:smallCParser.ReturnStatementContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#returnStatement.
+    def exitReturnStatement(self, ctx:smallCParser.ReturnStatementContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#constantProduct.
     def enterConstantProduct(self, ctx:smallCParser.ConstantProductContext):
         pass
@@ -95,6 +104,15 @@ class smallCListener(ParseTreeListener):
 
     # Exit a parse tree produced by smallCParser#comparison.
     def exitComparison(self, ctx:smallCParser.ComparisonContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#const.
+    def enterConst(self, ctx:smallCParser.ConstContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#const.
+    def exitConst(self, ctx:smallCParser.ConstContext):
         pass
 
 
@@ -161,12 +179,30 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#arrayDeclaration.
+    def enterArrayDeclaration(self, ctx:smallCParser.ArrayDeclarationContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#arrayDeclaration.
+    def exitArrayDeclaration(self, ctx:smallCParser.ArrayDeclarationContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#constantDeclaration.
     def enterConstantDeclaration(self, ctx:smallCParser.ConstantDeclarationContext):
         pass
 
     # Exit a parse tree produced by smallCParser#constantDeclaration.
     def exitConstantDeclaration(self, ctx:smallCParser.ConstantDeclarationContext):
+        pass
+
+
+    # Enter a parse tree produced by smallCParser#constantArrayDeclaration.
+    def enterConstantArrayDeclaration(self, ctx:smallCParser.ConstantArrayDeclarationContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#constantArrayDeclaration.
+    def exitConstantArrayDeclaration(self, ctx:smallCParser.ConstantArrayDeclarationContext):
         pass
 
 

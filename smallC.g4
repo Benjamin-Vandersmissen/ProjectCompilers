@@ -60,13 +60,23 @@ typeName
 declaration
         : constantDeclaration
         | typeName identifier (ASSIGN expression)?
-        | typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList? CLOSE_CURLY
+        | arrayDeclaration
+        ;
+
+arrayDeclaration
+        : typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
+        | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList? CLOSE_CURLY
         ;
 
 constantDeclaration
         : typeName identifier
         | typeName constantAssignment
-        | typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE (ASSIGN OPEN_CURLY constantArrayList? CLOSE_CURLY)?
+        | constantArrayDeclaration
+        ;
+
+constantArrayDeclaration
+        : typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE (ASSIGN OPEN_CURLY constantArrayList? CLOSE_CURLY)?
+        | typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE (ASSIGN OPEN_CURLY constantArrayList? CLOSE_CURLY)
         ;
 
 arrayList
@@ -78,7 +88,7 @@ constantArrayList
         ;
 
 argumentDeclarationList
-        : (typeName identifier? COMMA)* typeName identifier?
+        : (typeName (identifier(OPEN_SQUARE CLOSE_SQUARE)?)? COMMA)* typeName(OPEN_SQUARE CLOSE_SQUARE)? identifier?
         ;
 
 functionDeclaration
@@ -154,7 +164,7 @@ dereference
         ;
 
 depointer
-        : STAR* AMPERSAND? STAR* VARIABLE  //TODO: als Brent zegt niet ondersteunen, de & eruit halen!!
+        : STAR* VARIABLE
         ;
 
 
