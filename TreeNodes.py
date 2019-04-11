@@ -1,6 +1,7 @@
 typename = None
 
 symbolTables = list()
+reservedWords = ['if', 'else', 'return', 'while', 'char', 'int', 'float', 'void']
 
 class TreeNode:
     def text(self):
@@ -174,7 +175,15 @@ class ASTNode(TreeNode):
         pass
 
 class ProgramNode(ASTNode):
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.useSTDIO = False
+
     def startDFS(self):
+        if self.useSTDIO:
+            functionTable.addFunction('int', 'printf', ['char*', '...'], True)
+            functionTable.addFunction('int', 'scanf', ['char*', '...'], True)
+
         global symbolTables
         symbolTables.append(SymbolTableNode())
         #TODO: add standaard shit in symboltable
@@ -183,6 +192,10 @@ class ProgramNode(ASTNode):
         global symbolTables, functionTable
         self.symbolTable = symbolTables.pop()
         self.functionTable = functionTable
+
+    def processToken(self, token):
+        if token == '#include <stdio.h>':
+            self.useSTDIO = True
 
 class CodeBodyNode(ASTNode):
     def startDFS(self):
@@ -256,6 +269,9 @@ class DeclarationNode(ASTNode):
     def startDFS(self):
         typename = self.children[0].typename
         identifier = self.children[1].identifier
+        if identifier in reservedWords:
+            raise Exception("Invalid usage of reserved keyword " + identifier + " as identifier at "
+                            + str(self.line)+":"+str(self.column))
         symbolTables[-1].addSymbol(typename, identifier)
 
 class ArrayDeclarationNode(ASTNode):
@@ -275,6 +291,9 @@ class ArrayDeclarationNode(ASTNode):
                 size = self.children[2].value
         typename = typename + '[' + str(size) + ']'
 
+        if identifier in reservedWords:
+            raise Exception("Invalid usage of reserved keyword " + identifier + " as identifier at "
+                            + str(self.line)+":"+str(self.column))
         symbolTables[-1].addSymbol(typename, identifier)
 
 
@@ -285,6 +304,9 @@ class ConstantDeclarationNode(DeclarationNode):
             identifier = self.children[1].identifier
         else:
             identifier = self.children[1].children[0].identifier
+        if identifier in reservedWords:
+            raise Exception("Invalid usage of reserved keyword " + identifier + " as identifier at "
+                            + str(self.line)+":"+str(self.column))
         symbolTables[-1].addSymbol(typename, identifier)
 
 class ConstantArrayDeclarationNode(ArrayDeclarationNode):
@@ -354,6 +376,9 @@ class ArgumentDeclarationListNode(ASTNode):
         for i in range(0, len(self.children), 2):
             typename = self.children[i].typename
             identifier = self.children[i+1].identifier
+            if identifier in reservedWords:
+                raise Exception("Invalid usage of reserved keyword " + identifier + " as identifier at "
+                                + str(self.line) + ":" + str(self.column))
             symbolTables[-1].addSymbol(typename, identifier)
 
 class FunctionDefinitionNode(ASTNode):
