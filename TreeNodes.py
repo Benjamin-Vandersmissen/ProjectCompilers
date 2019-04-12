@@ -1,7 +1,6 @@
-typename = None
-
 symbolTables = list()
 reservedWords = ['if', 'else', 'return', 'while', 'char', 'int', 'float', 'void']
+
 
 class TreeNode:
     def text(self):
@@ -43,8 +42,16 @@ class SymbolTableNode(TreeNode):
         representation += '</table>>];\n'
         return representation
 
-    def getEntry(self, index):
-        return list(self.symbolTable.items())[index]
+    def getEntry(self, identifier):
+        found = identifier in self.symbolTable
+
+        if not found and self.parent is not None:
+            return self.parent.getEntry(identifier)
+        elif found:
+            return self.symbolTable[identifier]
+
+        return None
+
 
 class FunctionTableNode(TreeNode):
     def __init__(self):
@@ -94,7 +101,9 @@ class FunctionTableNode(TreeNode):
         else:
             return False
 
+
 functionTable = FunctionTableNode()
+
 
 class ASTNode(TreeNode):
 
@@ -130,17 +139,15 @@ class ASTNode(TreeNode):
         for child in node.children:
             self.add(child)
 
-
     def startDFS(self):
-        #function for overriding in subclasses
+        # function for overriding in subclasses
         pass
 
     def endDFS(self):
         pass
 
-
     def dotRepresentation(self):
-        return '\t"' + self.name() + '_' + str(self.id) + '"[label="'+self.name() + '"];\n'
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.name() + '"];\n'
 
     def toDot(self, file):
         if self.parent is None:
@@ -148,7 +155,8 @@ class ASTNode(TreeNode):
             file.write(self.dotRepresentation())
         else:
             file.write(self.dotRepresentation())
-            file.write('\t"' + self.parent.name() + '_' + str(self.parent.id) + '" -> "' + self.name() + '_' + str(self.id) + '";\n')
+            file.write('\t"' + self.parent.name() + '_' + str(self.parent.id) + '" -> "' + self.name() + '_' + str(
+                self.id) + '";\n')
 
         if self.symbolTable:
             file.write('\t"' + self.name() + '_' + str(self.id) + '_' + self.symbolTable.dotRepresentation())
@@ -166,7 +174,7 @@ class ASTNode(TreeNode):
             file.write("}")
 
     def toLLVM(self, file):
-        #LLVM output here
+        # LLVM output here
         for child in self.children:
             child.toLLVM(file)
 
@@ -176,6 +184,10 @@ class ASTNode(TreeNode):
 
     def throwError(self, text):
         raise Exception("({}:{}) : ".format(self.line, self.column) + text)
+
+    def printWarning(self, text):
+        print("Warning ({}:{}) : ".format(self.line, self.column) + text)
+
 
 class ProgramNode(ASTNode):
     def __init__(self):
@@ -189,7 +201,7 @@ class ProgramNode(ASTNode):
 
         global symbolTables
         symbolTables.append(SymbolTableNode())
-        #TODO: add standaard shit in symboltable
+        # TODO: add standaard shit in symboltable
 
     def endDFS(self):
         global symbolTables, functionTable
@@ -200,23 +212,27 @@ class ProgramNode(ASTNode):
         if token == '#include <stdio.h>':
             self.useSTDIO = True
 
+
 class CodeBodyNode(ASTNode):
     def startDFS(self):
-        #build a new symbol table
+        # build a new symbol table
         global symbolTables
         newSymbolTable = SymbolTableNode()
         symbolTables[-1].add(newSymbolTable)
         symbolTables.append(newSymbolTable)
 
     def endDFS(self):
-        #symbol table is finished, pop from stack
+        # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
+
 
 class StatementNode(ASTNode):
     pass
 
+
 class ReturnStatementNode(ASTNode):
     pass
+
 
 class DereferenceNode(ASTNode):
     def __init__(self):
@@ -229,6 +245,12 @@ class DereferenceNode(ASTNode):
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.dereference + '"];\n'
 
+    def type(self):
+        identifier = self.dereference[1:]
+        type = symbolTables[-1].getEntry(identifier)
+        return type + '*'
+
+
 class DepointerNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
@@ -240,17 +262,34 @@ class DepointerNode(ASTNode):
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.depointer + '"];\n'
 
+    def startDFS(self):
+        identifier = self.depointer.split('*')[-1]
+        type = symbolTables[-1].getEntry(identifier)
+        if type.count('*') < self.depointer.count('*'):
+            self.throwError("Indirection requires pointer operand ('{}' invalid)".format(type.split('*')[0]))
+
+    def type(self):
+        identifier = self.depointer.split('*')[-1]
+        type = symbolTables[-1].getEntry(identifier)
+        type = type.split('*')[0] + (type.count('*') - self.depointer.count('*')) * '*'
+        return type
+
+
 class ElseStatementNode(ASTNode):
     pass
+
 
 class IfStatementNode(ASTNode):
     pass
 
+
 class WhileStatementNode(ASTNode):
     pass
 
+
 class WhileBlockNode(ASTNode):
     pass
+
 
 class TypeNameNode(ASTNode):
 
@@ -261,12 +300,9 @@ class TypeNameNode(ASTNode):
     def processToken(self, token):
         self.typename += token
 
-    def startDFS(self):
-        global typename
-        typename = self.typename
-
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.typename + '"];\n'
+
 
 class DeclarationNode(ASTNode):
     def startDFS(self):
@@ -276,9 +312,36 @@ class DeclarationNode(ASTNode):
             self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
+
 class ArrayDeclarationNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
+
+    def compatibleInitializerTypes(self, lhsType, rhsType):
+        if lhsType in ['char', 'int'] and rhsType in ['int', 'float'] and lhsType != rhsType:
+            self.printWarning("possible loss of information by assigning type {} to type {}".format(rhsType, lhsType))
+
+        if (lhsType == 'float' or rhsType == 'float') and (lhsType.count('*') > 0 or rhsType.count('*') > 0
+                                                           or rhsType.count('[') > 0):
+            self.throwError('initializing {} with an expression of type {}"'.format(lhsType, rhsType))
+
+        if lhsType.count('*') != rhsType.count('*') + rhsType.count('['):
+            if lhsType.count('*') == 0:
+                self.printWarning(
+                    "Incompatible pointer to integer conversion initializing {} with an expression of type {}".format(
+                        lhsType,
+                        rhsType))
+            elif lhsType.count('*') == 0:
+                self.printWarning(
+                    "Incompatible pointer to integer conversion initializing {} with an expression of type {}".format(
+                        lhsType,
+                        rhsType))
+            else:
+                self.printWarning(
+                    "Incompatible pointer types initializing {} with an expression of type {}".format(lhsType, rhsType))
+        elif lhsType.count('*') > 0 and lhsType.split('*')[0] != rhsType.split('*')[0]:
+            self.printWarning(
+                "Incompatible pointer types initializing {} with an expression of type {}".format(lhsType, rhsType))
 
     def startDFS(self):
         typename = self.children[0].typename
@@ -286,9 +349,14 @@ class ArrayDeclarationNode(ASTNode):
         size = ' '
         if len(self.children) == 4:
             size = self.children[2].value
+            for child in self.children[3].children:
+                self.compatibleInitializerTypes(typename, child.type())
+
         if len(self.children) == 3:
             if isinstance(self.children[2], ArrayListNode):
-                size = len(self.children[2])
+                size = len(self.children[2].children)
+                for child in self.children[3].children:
+                    self.compatibleInitializerTypes(typename, child.type())
             else:
                 size = self.children[2].value
         typename = typename + '[' + str(size) + ']'
@@ -309,26 +377,30 @@ class ConstantDeclarationNode(DeclarationNode):
             self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
+
 class ConstantArrayDeclarationNode(ArrayDeclarationNode):
     pass
 
-class ConstantArrayListNode(ASTNode):
-    pass
-
-class ConstantAssignmentNode(ASTNode):
-    pass
 
 class ConstantExpressionNode(ASTNode):
     pass
 
+
 class ConstantValueNode(ASTNode):
     pass
+
 
 class ConstantNode(ASTNode):
     pass
 
+
 class ArrayListNode(ASTNode):
     pass
+
+
+class ConstantArrayListNode(ArrayListNode):
+    pass
+
 
 class FunctionDeclarationNode(ASTNode):
     def startDFS(self):
@@ -342,6 +414,8 @@ class FunctionDeclarationNode(ASTNode):
         identifier = self.children[1].identifier
 
         arguments = list()
+        # TODO: recognise arrays as arguments
+
         if len(self.children) > 2:
             for i in range(0, len(self.children[2].children), 2):
                 argumentType = self.children[2].children[i].typename
@@ -350,20 +424,11 @@ class FunctionDeclarationNode(ASTNode):
         if functionTable.exists(identifier) and not functionTable.signatureExists(typename, identifier, arguments):
             self.throwError("function {} is redeclared with a different signature".format(identifier))
 
-        functionTable.addFunction(typename, identifier, list(), False)
+        functionTable.addFunction(typename, identifier, arguments, False)
 
     def endDFS(self):
         # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
-
-        typename = self.children[0].typename
-        identifier = self.children[1].identifier
-
-        arguments = list()
-        for i in range(1, len(self.symbolTable.symbolTable)):
-            arguments.append(self.symbolTable.getEntry(i)[1])
-
-        functionTable.addFunction(typename, identifier, arguments, False)
 
         # This is a function declaration in a function definition
         # We need to push all symbolTable entries back a level
@@ -371,14 +436,16 @@ class FunctionDeclarationNode(ASTNode):
             symbolTables[-1] = self.symbolTable
         self.symbolTable = None
 
+
 class ArgumentDeclarationListNode(ASTNode):
     def startDFS(self):
         for i in range(0, len(self.children), 2):
             typename = self.children[i].typename
-            identifier = self.children[i+1].identifier
+            identifier = self.children[i + 1].identifier
             if identifier in reservedWords:
                 self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
             symbolTables[-1].addSymbol(typename, identifier)
+
 
 class FunctionDefinitionNode(ASTNode):
     def startDFS(self):
@@ -395,25 +462,54 @@ class FunctionDefinitionNode(ASTNode):
 
     def endDFS(self):
         # symbol table is finished, pop from stack
+        identifier = self.children[0].children[1].identifier
+        entry = functionTable.functionTable[identifier]
+        functionTable.functionTable[identifier] = (entry[0], entry[1], True)
         self.symbolTable = symbolTables.pop()
 
-        typename = self.children[0].children[0].typename  # declaration is always first child of definition
-        identifier = self.children[0].children[1].identifier
-
-        arguments = list()
-        for i in range(0, len(self.symbolTable.symbolTable)):
-            arguments.append(self.symbolTable.getEntry(i)[1])
-
-        functionTable.addFunction(typename, identifier, arguments, True)
 
 class ReturnTypeNode(TypeNameNode):
     pass
 
+
 class ArrayElementNode(ASTNode):
-    pass
+    def type(self):
+        identifier = self.children[0].identifier
+        type = symbolTables[-1].getEntry(identifier)
+        return type.split('[')[0]  # simplistic approach, only works for one dimensional arrays
+
 
 class AssignmentNode(ASTNode):
+    def startDFS(self):
+        lhsType = self.children[0].type()
+        rhsType = self.children[1].type()
+
+        if lhsType in ['char', 'int'] and rhsType in ['int', 'float'] and lhsType != rhsType:
+            self.printWarning("possible loss of information by assigning type {} to type {}".format(rhsType, lhsType))
+
+        if '[' in lhsType:
+            self.throwError("Array type {} is non-assignable".format(lhsType))
+
+        if (lhsType == 'float' or rhsType == 'float') and (lhsType.count('*') > 0 or rhsType.count('*') > 0
+                                                           or rhsType.count('[') > 0):
+            self.throwError('Assigning to {} from incompatible type {}'.format(lhsType, rhsType))
+
+        if lhsType.count('*') != rhsType.count('*') + rhsType.count('['):
+            if lhsType.count('*') == 0:
+                self.printWarning(
+                    "Incompatible pointer to integer conversion assigning to {} from {}".format(lhsType, rhsType))
+            elif lhsType.count('*') == 0:
+                self.printWarning(
+                    "Incompatible integer to pointer conversion assigning to {} from {}".format(lhsType, rhsType))
+            else:
+                self.printWarning("Incompatible pointer types assigning to {} from {}".format(lhsType, rhsType))
+        elif lhsType.count('*') > 0 and lhsType.split('*')[0] != rhsType.split('*')[0]:
+            self.printWarning("Incompatible pointer types assigning to {} from {}".format(lhsType, rhsType))
+
+
+class ConstantAssignmentNode(AssignmentNode):
     pass
+
 
 class ValueNode(ASTNode):
     def __init__(self):
@@ -442,6 +538,10 @@ class IntValueNode(ValueNode):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + \
                ('-' if self.sign < 0 else '') + str(self.value) + '"];\n'
 
+    def type(self):
+        return 'int'
+
+
 class FloatValueNode(ValueNode):
 
     def __init__(self):
@@ -463,18 +563,50 @@ class FloatValueNode(ValueNode):
             self.integer = int(token)
         else:
             self.fraction = int(token)
-            self.value = float(str(self.integer)+'.'+str(self.fraction))
+            self.value = float(str(self.integer) + '.' + str(self.fraction))
 
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + \
                ('-' if self.sign < 0 else '') + str(self.value) + '"];\n'
+
+    def type(self):
+        return 'float'
+
 
 class CharValueNode(ValueNode):
 
     def processToken(self, token):
         self.value = token
 
+    def type(self):
+        return 'char'
+
+
 class FunctionCallNode(ASTNode):
+
+    def compatibleArgumentTypes(self, lhsType, rhsType):
+        if lhsType in ['char', 'int'] and rhsType in ['int', 'float'] and lhsType != rhsType:
+            self.printWarning("possible loss of information by assigning type {} to type {}".format(rhsType, lhsType))
+
+        if (lhsType == 'float' or rhsType == 'float') and (lhsType.count('*') > 0 or rhsType.count('*') > 0
+                                                           or rhsType.count('[') > 0):
+            self.throwError('Passing {} to parameter of incompatible type {}'.format(rhsType, lhsType))
+
+        if lhsType.count('*') != rhsType.count('*') + rhsType.count('['):
+            if lhsType.count('*') == 0:
+                self.printWarning(
+                    "Incompatible pointer to integer conversion passing {} to parameter of type {}".format(rhsType,
+                                                                                                           lhsType))
+            elif lhsType.count('*') == 0:
+                self.printWarning(
+                    "Incompatible pointer to integer conversion passing {} to parameter of type {}".format(rhsType,
+                                                                                                           lhsType))
+            else:
+                self.printWarning(
+                    "Incompatible pointer types passing {} to parameter of type {}".format(rhsType, lhsType))
+        elif lhsType.count('*') > 0 and lhsType.split('*')[0] != rhsType.split('*')[0]:
+            self.printWarning("Incompatible pointer types passing {} to parameter of type {}".format(rhsType, lhsType))
+
     def startDFS(self):
         identifier = self.children[0].identifier
         if not functionTable.exists(identifier):
@@ -483,6 +615,7 @@ class FunctionCallNode(ASTNode):
             self.throwError("Function {} is not defined".format(identifier))
 
         argumentCount = len(self.children[1].children)
+        f = functionTable
         arguments = functionTable.functionTable[identifier][1]
 
         if argumentCount > len(arguments):
@@ -490,19 +623,30 @@ class FunctionCallNode(ASTNode):
 
         if arguments[-1] == '...':
             # infinite arguments possible
-            if argumentCount < len(arguments) -1:
+            if argumentCount < len(arguments) - 1:
                 self.throwError("Expected at least {} arguments, got()".format(len(arguments) - 1, argumentCount))
+
+            for i in range(len(arguments) - 1):  # Don't check the optional arguments
+                self.compatibleArgumentTypes(arguments[i], self.children[1].children[i].type())
+
         else:
             if argumentCount < len(arguments):
                 self.throwError("Expected {} arguments, got {}".format(len(arguments), argumentCount))
+            for i in range(len(arguments)):
+                self.compatibleArgumentTypes(arguments[i], self.children[1].children[i].type())
 
-        # TODO: Typecheck each argument and add argument count check
+    def type(self):
+        if functionTable.exists(self.children[0].identifier):
+            return functionTable.functionTable[self.children[0].identifier][0]
+
 
 class ArgumentListNode(ASTNode):
     pass
 
+
 class OperandNode(ASTNode):
     pass
+
 
 class OperationNode(ASTNode):
     def __init__(self):
@@ -518,23 +662,77 @@ class OperationNode(ASTNode):
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.operator + '"];\n'
 
+
 class SumNode(OperationNode):
-    pass
+    def isCompatibleType(self, type1, type2):
+        if type1 in ['int', 'float', 'char'] and type2 in ['int', 'float', 'char']:
+            return True
+        if self.operator == '+' and (type1 in ['int', 'char'] and type2[-1] == '*'
+                                     or type1[-1] == '*' and type2 in ['int', 'char']):
+            return True
+        if self.operator == '-' and type1[-1] == '*' and type2 in ['int', 'char']:
+            return True
+        self.throwError('Invalid types for binary operator {} : {}, {}'.format(self.operator, type1, type2))
+
+    def mergeType(self, type1, type2):
+        if type1 in ['char', 'int'] and type2 in ['int', 'float']:
+            return type2
+        if type1 in ['int', 'float'] and type2 in ['char', 'int']:
+            return type1
+        if type1[-1] == '*':
+            return type1
+        if type2[-1] == '*':
+            return type2
+
+    def type(self):
+        type = None
+        for child in self.children:
+            if type is None:
+                type = child.type()
+            else:
+                if self.isCompatibleType(type, child.type()):
+                    type = self.mergeType(type, child.type())
+        return type
+
 
 class ProductNode(OperationNode):
-    pass
+    def isCompatibleType(self, type1, type2):
+        if type1 in ['int', 'float', 'char'] and type2 in ['int', 'float', 'char']:
+            return True
+        self.throwError('Invalid types for binary operator {} : {}, {}'.format(self.operator, type1, type2))
+
+    def mergeType(self, type1, type2):
+        if type1 in ['char', 'int'] and type2 in ['int', 'float']:
+            return type2
+        if type1 in ['int', 'float'] and type2 in ['char', 'int']:
+            return type1
+
+    def type(self):
+        type = None
+        for child in self.children:
+            if type is None:
+                type = child.type()
+            else:
+                if self.isCompatibleType(type, child.type()):
+                    type = self.mergeType(type, child.type())
+        return type
+
 
 class ComparisonNode(OperationNode):
     pass
 
+
 class ConstantComparisonNode(OperationNode):
     pass
 
-class ConstantSumNode(OperationNode):
+
+class ConstantSumNode(SumNode):
     pass
+
 
 class ConstantProductNode(OperationNode):
     pass
+
 
 class IdentifierNode(ASTNode):
 
@@ -551,5 +749,9 @@ class IdentifierNode(ASTNode):
     def startDFS(self):
         if not symbolTables[-1].exists(self.identifier) and not functionTable.exists(self.identifier):
             print(symbolTables[-1].symbolTable)
-            raise Exception("Identifier " + self.identifier + " not found at " + str(self.line)+":"+str(self.column))
+            raise Exception(
+                "Identifier " + self.identifier + " not found at " + str(self.line) + ":" + str(self.column))
 
+    def type(self):
+        if symbolTables[-1].exists(self.identifier):
+            return symbolTables[-1].getEntry(self.identifier)
