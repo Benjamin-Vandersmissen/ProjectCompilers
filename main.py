@@ -20,10 +20,14 @@ def main(argv):
     walker.walk(listener, tree)
     parser.addParseListener(listener)
 
-    file = open("AST.dot", "w")
+    dotFile = open("AST.dot", "w")
     listener.AST.buildSymbolTable()
-    listener.AST.toDot(file)
+    listener.AST.toDot(dotFile)
+    dotFile.close()
 
+    llvmFile = open("program.ll", "w")
+    listener.AST.toLLVM(llvmFile)
+    llvmFile.close()
 
 if __name__ == '__main__':
     main(sys.argv)

@@ -1,3 +1,5 @@
+import llvm
+
 symbolTables = list()
 reservedWords = ['if', 'else', 'return', 'while', 'char', 'int', 'float', 'void']
 
@@ -174,9 +176,10 @@ class ASTNode(TreeNode):
             file.write("}")
 
     def toLLVM(self, file):
-        # LLVM output here
+        # LLVM output part 1 here
         for child in self.children:
             child.toLLVM(file)
+        # LLVM output part 2 here
 
     def processToken(self, token):
         # empty function to be overridden in derived classes
@@ -214,6 +217,10 @@ class ProgramNode(ASTNode):
 
 
 class CodeBodyNode(ASTNode):
+    def __index__(self):
+        self.counter = 1
+        self.counterTable = dict()
+
     def startDFS(self):
         # build a new symbol table
         global symbolTables
@@ -224,6 +231,10 @@ class CodeBodyNode(ASTNode):
     def endDFS(self):
         # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
+
+    def getCounter(self):
+        self.counter += 1
+        return self.counter - 1
 
 
 class StatementNode(ASTNode):
@@ -312,6 +323,9 @@ class DeclarationNode(ASTNode):
             self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
+    def toLLVM(self, file):
+        pass
+
 
 class ArrayDeclarationNode(ASTNode):
     def __init__(self):
@@ -376,6 +390,31 @@ class ConstantDeclarationNode(DeclarationNode):
         if identifier in reservedWords:
             self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
+
+    def toLLVM(self, file):
+        typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename)
+        if isinstance(self.parent, ProgramNode):
+            if isinstance(self.children[1], IdentifierNode):
+                # @a = common global i32 0, align 4
+                file.write(
+                    "@" + str(self.children[1].identifier) + " = common global " + str(typeAndAlign[0]) + " 0, align " +
+                    typeAndAlign[1] + "\n")
+            else:
+                file.write("@" + str(self.children[1].children[0].identifier) + " = global " + str(typeAndAlign[0]) + " " + str(llvm.valueTransformer(self.children[0].typename, self.children[1].children[1].value)) + ", align " + typeAndAlign[1] + "\n")
+        elif isinstance(self.parent, CodeBodyNode):  # TODO: moet nog getest worden als functie werkt
+            # %1 = alloca i32, align 4
+            localNumber = self.parent.getCounter()
+            file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0]) + ", align " + str(
+                typeAndAlign[1]) + "\n")
+            if isinstance(self.children[1], IdentifierNode):
+                identifier = self.children[1].identifier
+            else:
+                identifier = self.children[1].children[0].identifier
+                # store i32 3, i32* %1, align 4
+                file.write("store " + str(typeAndAlign[0]) + " " + str(
+                    llvm.valueTransformer(self.children[0].typename, self.children[1].children[1].value)) + ", " + str(
+                    typeAndAlign[0]) + "* %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
+            self.parent.counterTable[identifier] = localNumber  # Link the var and localNumber with each other
 
 
 class ConstantArrayDeclarationNode(ArrayDeclarationNode):
@@ -572,7 +611,7 @@ class FloatValueNode(ValueNode):
 class CharValueNode(ValueNode):
 
     def processToken(self, token):
-        self.value = token
+        self.value = token[1]
 
     def type(self):
         return 'char'
@@ -721,6 +760,7 @@ class ComparisonNode(OperationNode):
 class ConstantComparisonNode(OperationNode):
     pass
 
+
 class ConstantSumNode(SumNode):
     def foldExpression(self):
         type = self.type()
@@ -734,9 +774,15 @@ class ConstantSumNode(SumNode):
             if value is None:
                 value = child.value
             elif self.operator == '+':
-                value += child.value
+                if isinstance(child.value, str):
+                    value += ord(child.value)
+                else:
+                    value += child.value
             elif self.operator == '-':
-                value -= child.value
+                if isinstance(child.value, str):
+                    value -= ord(child.value)
+                else:
+                    value -= child.value
 
         index = self.parent.children.index(self)
         if type == 'float':
@@ -751,7 +797,6 @@ class ConstantSumNode(SumNode):
 
     def startDFS(self):
         self.foldExpression()
-
 
 
 class ConstantProductNode(ProductNode):
@@ -781,7 +826,6 @@ class ConstantProductNode(ProductNode):
 
         self.parent.children[index].value = value
         self.parent.children[index].parent = self.parent
-
 
     def startDFS(self):
         self.foldExpression()
