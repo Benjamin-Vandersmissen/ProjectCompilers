@@ -382,10 +382,6 @@ class ConstantArrayDeclarationNode(ArrayDeclarationNode):
     pass
 
 
-class ConstantExpressionNode(ASTNode):
-    pass
-
-
 class ConstantValueNode(ASTNode):
     pass
 
@@ -725,13 +721,70 @@ class ComparisonNode(OperationNode):
 class ConstantComparisonNode(OperationNode):
     pass
 
-
 class ConstantSumNode(SumNode):
-    pass
+    def foldExpression(self):
+        type = self.type()
+        value = None
+        for index in range(len(self.children)):
+            child = self.children[index]
+            if isinstance(child, ConstantSumNode) or isinstance(child, ConstantProductNode):
+                child.foldExpression()
+                test = 0
+                child = self.children[index]
+            if value is None:
+                value = child.value
+            elif self.operator == '+':
+                value += child.value
+            elif self.operator == '-':
+                value -= child.value
+
+        index = self.parent.children.index(self)
+        if type == 'float':
+            self.parent.children[index] = FloatValueNode()
+        if type == 'int':
+            self.parent.children[index] = IntValueNode()
+        if type == 'char':
+            self.parent.children[index] = CharValueNode()
+
+        self.parent.children[index].value = value
+        self.parent.children[index].parent = self.parent
+
+    def startDFS(self):
+        self.foldExpression()
 
 
-class ConstantProductNode(OperationNode):
-    pass
+
+class ConstantProductNode(ProductNode):
+    def foldExpression(self):
+        type = self.type()
+        value = None
+        for index in range(len(self.children)):
+            child = self.children[index]
+            if isinstance(child, ConstantSumNode) or isinstance(child, ConstantProductNode):
+                child.foldExpression()
+                test = 0
+                child = self.children[index]
+            if value is None:
+                value = child.value
+            elif self.operator == '*':
+                value *= child.value
+            elif self.operator == '/':
+                value /= child.value
+
+        index = self.parent.children.index(self)
+        if type == 'float':
+            self.parent.children[index] = FloatValueNode()
+        if type == 'int':
+            self.parent.children[index] = IntValueNode()
+        if type == 'char':
+            self.parent.children[index] = CharValueNode()
+
+        self.parent.children[index].value = value
+        self.parent.children[index].parent = self.parent
+
+
+    def startDFS(self):
+        self.foldExpression()
 
 
 class IdentifierNode(ASTNode):
