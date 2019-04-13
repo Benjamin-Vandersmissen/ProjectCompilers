@@ -11,6 +11,9 @@ def checkTypeAndAlign(typename):
     elif typename == "float":
         typename = "float"
         align = "4"
+    elif typename == "void":
+        typename = "void"
+        align = "ERROR"
 
     return typename, align
 

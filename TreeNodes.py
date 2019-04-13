@@ -217,7 +217,8 @@ class ProgramNode(ASTNode):
 
 
 class CodeBodyNode(ASTNode):
-    def __index__(self):
+    def __init__(self):
+        super().__init__()
         self.counter = 1
         self.counterTable = dict()
 
@@ -235,6 +236,30 @@ class CodeBodyNode(ASTNode):
     def getCounter(self):
         self.counter += 1
         return self.counter - 1
+
+    def toLLVM(self, file):
+        file.write("{\n")
+        if isinstance(self.parent, FunctionDefinitionNode):
+            symbolTable = self.parent.symbolTable.symbolTable;
+            amountOfArguments = len(symbolTable)
+            self.counter += amountOfArguments
+            for identifier, typename in symbolTable.items():
+                typeAndAlign = llvm.checkTypeAndAlign(typename)
+                localNumber = self.getCounter()
+                # %4 = alloca i32, align 4
+                file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0]) + ", align " + str(
+                    typeAndAlign[1]) + "\n")
+                # store i32 %0, i32* %4, align 4
+                file.write("store " + str(typeAndAlign[0]) + " %" + str(localNumber - amountOfArguments - 1) + ", "
+                    + str(typeAndAlign[0]) + "* %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
+                self.counterTable[identifier] = localNumber  # Link the var and localNumber with each other
+        voidType = self.parent.children[0].children[0].typename == "void"
+        for child in self.children:
+            if not voidType or not isinstance(child, ReturnStatementNode):
+                child.toLLVM(file)
+        if voidType:
+            file.write("ret void\n")
+        file.write("}\n")
 
 
 class StatementNode(ASTNode):
@@ -400,8 +425,11 @@ class ConstantDeclarationNode(DeclarationNode):
                     "@" + str(self.children[1].identifier) + " = common global " + str(typeAndAlign[0]) + " 0, align " +
                     typeAndAlign[1] + "\n")
             else:
-                file.write("@" + str(self.children[1].children[0].identifier) + " = global " + str(typeAndAlign[0]) + " " + str(llvm.valueTransformer(self.children[0].typename, self.children[1].children[1].value)) + ", align " + typeAndAlign[1] + "\n")
-        elif isinstance(self.parent, CodeBodyNode):  # TODO: moet nog getest worden als functie werkt
+                file.write("@" + str(self.children[1].children[0].identifier) + " = global " + str(
+                    typeAndAlign[0]) + " " + str(
+                    llvm.valueTransformer(self.children[0].typename, self.children[1].children[1].value)) + ", align " +
+                           typeAndAlign[1] + "\n")
+        elif isinstance(self.parent, CodeBodyNode):
             # %1 = alloca i32, align 4
             localNumber = self.parent.getCounter()
             file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0]) + ", align " + str(
@@ -470,6 +498,32 @@ class FunctionDeclarationNode(ASTNode):
         if len(symbolTables) > 1:
             symbolTables[-1] = self.symbolTable
         self.symbolTable = None
+
+    def toLLVM(self, file):
+        typeAndAsign = llvm.checkTypeAndAlign(self.children[0].typename)
+        declaration = False
+        file.write("\n")
+        if isinstance(self.parent, FunctionDefinitionNode):
+            file.write("define ")
+        else:
+            declaration = True
+            file.write("declare ")
+        file.write(str(typeAndAsign[0]) + " @" + str(self.children[1].identifier + "("))
+        if len(self.children) == 2:
+            # define i32 @main()
+            file.write(")")
+        elif len(self.children) == 3:
+            # define void @f1(i32)
+            for i in range(0, len(self.children[2].children) - 1, 2):
+                typeAndAsign = llvm.checkTypeAndAlign(self.children[2].children[i].typename)
+                if i != 0:
+                    file.write(", ")
+                file.write(str(typeAndAsign[0]))
+                if typeAndAsign[0] == "i8":
+                    file.write(" signext")
+            file.write(") ")
+        if declaration:
+            file.write("\n")
 
 
 class ArgumentDeclarationListNode(ASTNode):
