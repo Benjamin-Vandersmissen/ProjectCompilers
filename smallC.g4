@@ -5,7 +5,7 @@ program
         ;
 
 globalDeclaration
-        : (functionDeclaration|constantDeclaration)? SEMICOLON globalDeclaration?
+        : (functionDeclaration|constantDeclaration|constantAssignment)? SEMICOLON globalDeclaration?
         | functionDefinition globalDeclaration?
         | INCLUDE_STDIO globalDeclaration?
         ;
