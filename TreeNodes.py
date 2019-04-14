@@ -222,7 +222,10 @@ class ProgramNode(ASTNode):
         declarations = dict()
         for child in self.children:
             if isinstance(child, ConstantDeclarationNode):
-                declarations[child.children[1].identifier] = child
+                if isinstance(child.children[1], IdentifierNode):
+                    declarations[child.children[1].identifier] = child
+                else:
+                    declarations[child.child.children[1].children[0].identifier] = child
 
         for child in reversed(self.children):
             if isinstance(child, ConstantAssignmentNode):
