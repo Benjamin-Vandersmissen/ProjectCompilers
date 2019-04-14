@@ -271,10 +271,6 @@ class CodeBodyNode(ASTNode):
         file.write("}\n")
 
 
-class StatementNode(ASTNode):
-    pass
-
-
 class ReturnStatementNode(ASTNode):
     def toLLVM(self, file, funcDef=None):
         if len(self.children) == 0:
@@ -293,7 +289,7 @@ class ReturnStatementNode(ASTNode):
                     llvm.changeLLVMType(llvmReturnType, self.children[0].toLLVM(file, funcDef), funcDef, file)) + "\n")
 
 
-class DereferenceNode(ASTNode):
+class DereferenceNode(ASTNode):  # TODO: llvm
     def __init__(self):
         ASTNode.__init__(self)
         self.dereference = ''
@@ -310,7 +306,7 @@ class DereferenceNode(ASTNode):
         return type + '*'
 
 
-class DepointerNode(ASTNode):
+class DepointerNode(ASTNode):  # TODO: llvm
     def __init__(self):
         ASTNode.__init__(self)
         self.depointer = ''
@@ -334,19 +330,15 @@ class DepointerNode(ASTNode):
         return type
 
 
-class ElseStatementNode(ASTNode):
+class ElseStatementNode(ASTNode):  # TODO: llvm
     pass
 
 
-class IfStatementNode(ASTNode):
+class IfStatementNode(ASTNode):  # TODO: llvm
     pass
 
 
-class WhileStatementNode(ASTNode):
-    pass
-
-
-class WhileBlockNode(ASTNode):
+class WhileStatementNode(ASTNode):  # TODO: llvm
     pass
 
 
@@ -372,10 +364,20 @@ class DeclarationNode(ASTNode):
         symbolTables[-1].addSymbol(typename, identifier)
 
     def toLLVM(self, file, funcDef=None):
-        pass
+        typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename)
+        localNumber = funcDef.getLocalNumber(typeAndAlign)
+        identifier = self.children[1].identifier
+        funcDef.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
+        # %2 = alloca i32, align 4
+        file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0]) + ", align " + str(
+            typeAndAlign[1]) + "\n")
+        if len(self.children) == 3:
+            # store i32 %3, i32* %2, align 4
+            file.write("store " + str(typeAndAlign[0]) + " " + str(self.children[2].toLLVM(file, funcDef)) + ", " + str(
+                typeAndAlign[0]) + "* %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
 
 
-class ArrayDeclarationNode(ASTNode):
+class ArrayDeclarationNode(ASTNode):  # TODO: llvm
     def __init__(self):
         ASTNode.__init__(self)
 
@@ -470,10 +472,10 @@ class ConstantDeclarationNode(DeclarationNode):
                 file.write("store " + str(typeAndAlign[0]) + " " + str(
                     llvm.valueTransformer(self.children[0].typename, self.children[1].children[1].value)) + ", " + str(
                     typeAndAlign[0]) + "* %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
-            funcDef.counterTable[identifier] = localNumber  # Link the var and localNumber with each other
+            funcDef.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
 
 
-class ConstantArrayDeclarationNode(ArrayDeclarationNode):
+class ConstantArrayDeclarationNode(ArrayDeclarationNode):  # TODO: llvm
     pass
 
 
@@ -485,11 +487,11 @@ class ConstantNode(ASTNode):
     pass
 
 
-class ArrayListNode(ASTNode):
+class ArrayListNode(ASTNode):  # TODO: llvm
     pass
 
 
-class ConstantArrayListNode(ArrayListNode):
+class ConstantArrayListNode(ArrayListNode):  # TODO: llvm
     pass
 
 
@@ -608,7 +610,7 @@ class ReturnTypeNode(TypeNameNode):
     pass
 
 
-class ArrayElementNode(ASTNode):
+class ArrayElementNode(ASTNode):  # TODO: llvm
     def type(self):
         identifier = self.children[0].identifier
         type = symbolTables[-1].getEntry(identifier)
@@ -643,10 +645,10 @@ class AssignmentNode(ASTNode):
             self.printWarning("Incompatible pointer types assigning to {} from {}".format(lhsType, rhsType))
 
     def toLLVM(self, file, funcDef=None):
-        file.write("test assignemnet\n")
+        llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef), funcDef, file)
 
 
-class ConstantAssignmentNode(AssignmentNode):
+class ConstantAssignmentNode(AssignmentNode):  # TODO: llvm
     pass
 
 
@@ -779,7 +781,43 @@ class FunctionCallNode(ASTNode):
             return functionTable.functionTable[self.children[0].identifier][0]
 
     def toLLVM(self, file, funcDef=None):
-        file.write("test functionCall\n")
+        temp = funcDef.parent.functionTable.functionTable[self.children[0].identifier]
+        returnType = temp [0]
+        argumentTypes = temp[1]
+        arguments = []
+
+        for i in range(len(argumentTypes)):
+            loc = self.children[1].children[i].toLLVM(file, funcDef)
+            arguments.append(llvm.changeLLVMType(llvm.checkTypeAndAlign(argumentTypes[i])[0], loc, funcDef, file))
+
+        localNumber = 'ERROR'
+        typeAndAsign = llvm.checkTypeAndAlign(returnType)
+        if returnType != 'void':
+            localNumber = funcDef.getLocalNumber(typeAndAsign)
+            # %8 = call signext i8 @f1(i32 %5, i8 signext %7)
+            file.write('%' + str(localNumber) + ' = ')
+        file.write('call ')
+        if typeAndAsign[0] == 'i8':
+            file.write('signext ')
+        file.write(str(typeAndAsign[0]) + ' @' + str(self.children[0].identifier + '('))
+        if len(arguments) == 0:
+            # call void @f2()
+            file.write(')\n')
+        else:
+            # call void @f2(int %2, int %3)
+            for i in range(len(argumentTypes)):
+                typeAndAsign = llvm.checkTypeAndAlign(argumentTypes[i])
+                if i != 0:
+                    file.write(', ')
+                file.write(str(typeAndAsign[0]))
+                if typeAndAsign[0] == 'i8':
+                    file.write(' signext')
+                file.write(' ' + str(arguments[i]))
+            file.write(")\n")
+        if returnType != 'void':
+            return '%' + str(localNumber)
+        else:
+            return ''
 
 
 class ArgumentListNode(ASTNode):
@@ -825,7 +863,7 @@ class OperationNode(ASTNode):
                     llvmReturnType = llvm.getLLVMTypeOfLLVMVariable(llvmTokens[0], funcDef)
                 it += 1
                 continue
-            if isinstance(child, ValueNode):
+            if isinstance(child, ValueNode) or child.__class__.__name__[0:8] == 'Constant':
                 llvmTokens.append(llvm.valueTransformer(llvmReturnType, child.value))
             else:
                 llvmTokens.append(llvm.changeLLVMType(llvmReturnType, child.toLLVM(file, funcDef), funcDef, file))
@@ -1053,4 +1091,6 @@ class IdentifierNode(ASTNode):
             return symbolTables[-1].getEntry(self.identifier)
 
     def toLLVM(self, file, funcDef=None):
+        if self.identifier == 'x':
+            print("")
         return llvm.getValueOfCVariable(self.identifier, funcDef, file)

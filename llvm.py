@@ -109,16 +109,15 @@ def changeLLVMType(targetType, varName, funcDef, file):
 # expects wantedType to be an llvmType
 def getValueOfCVariable(varName, funcDef, file):
     if varName in funcDef.counterTable:  # If the wanted variable is a local variable
-        varName = funcDef.counterTable[varName]
-        typeAndAlign = funcDef.typeAndAlignTable[varName]
-        sign = '%'
+        localNumber = funcDef.counterTable[varName]
+        typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
+        varName = '%' + str(localNumber)
     else:  # If the wanted variable is a global variable
         typeAndAlign = funcDef.parent.typeAndAlignTable[varName]
-        sign = '@'
+        varName = '@' + str(varName)
     localNumber = funcDef.getLocalNumber(typeAndAlign)
     # %3 = load i32, i32* <@a/%1>, align 4
-    file.write('%' + str(localNumber) + ' = load ' + str(typeAndAlign[0]) + ', ' + str(typeAndAlign[0]) + '* ' + str(
-        sign) + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
+    file.write('%' + str(localNumber) + ' = load ' + str(typeAndAlign[0]) + ', ' + str(typeAndAlign[0]) + '* ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
     return '%' + str(localNumber)
 
 
@@ -126,11 +125,27 @@ def getValueOfCVariable(varName, funcDef, file):
 # expects varName to be an C varable name, better known as the identifier member
 def getLLVMTypeOfCVariable(varName, funcDef):
     if varName in funcDef.counterTable:  # If the wanted variable is a local variable
-        varName = funcDef.counterTable[varName]
-        typeAndAlign = funcDef.typeAndAlignTable[varName]
+        localNumber = funcDef.counterTable[varName]
+        typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
     else:  # If the wanted variable is a global variable
         typeAndAlign = funcDef.parent.typeAndAlignTable[varName]
     return typeAndAlign[0]
+
+
+# Store the value of an llvm variable in a llvm variable representing a C variable
+# expects varName to be a C variable or better known as identifier
+# expects valueVar to be an llvm varibale, better know as %1 or @a
+def writeLLVMStoreForCVariable(varName, valueVar, funcDef, file):
+    if varName in funcDef.counterTable:  # If the wanted variable is a local variable
+        localNumber = funcDef.counterTable[varName]
+        typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
+        varName = '%' + str(localNumber)
+    else:  # If the wanted variable is a global variable
+        typeAndAlign = funcDef.parent.typeAndAlignTable[varName]
+        varName = '@' + str(varName)
+    changeLLVMType(typeAndAlign[0], valueVar, funcDef, file)
+    # store i32 %2, i32* %1, align 4
+    file.write('store ' + str(typeAndAlign[0]) + ' ' + str(valueVar) + ', ' + str(typeAndAlign[0]) + '* ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
 
 
 # Get the llvm type of an llvm variable
@@ -147,10 +162,15 @@ def getLLVMTypeOfLLVMVariable(varName, funcDef):
 
 
 # Write the llvm code to do a full operation
+# expects operands to be a list of llvm variables, better know as %1 or @a
+# expects compasrion to be true if it the operation is a comparsion operation
 def writeLLVMOperation(llvmOperator, llvmReturnType, operands, funcDef, file, comparison=False):
     cur = operands[0]
     for i in range(1, len(operands)):
-        temp = changeLLVMType(llvmReturnType, cur, funcDef, file)
+        if isinstance(cur, str):
+            temp = changeLLVMType(llvmReturnType, cur, funcDef, file)
+        else:
+            temp = valueTransformer(llvmReturnType, cur)
         cur = operands[i]
         if comparison:
             typeAndAlign = checkTypeAndAlign('i1')
