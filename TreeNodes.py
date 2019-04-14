@@ -252,6 +252,12 @@ class CodeBodyNode(ASTNode):
         symbolTables[-1].add(newSymbolTable)
         symbolTables.append(newSymbolTable)
 
+        # Remove unused expressions
+        for child in self.children:
+            if isinstance(child, OperationNode):
+                child.printWarning("Unused expression: {}".format(child.text()))
+                self.children.remove(child)
+
     def endDFS(self):
         # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
@@ -324,6 +330,9 @@ class DereferenceNode(ASTNode):  # TODO: llvm
     def processToken(self, token):
         self.dereference += token
 
+    def text(self):
+        return str(self.dereference)
+
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.dereference + '"];\n'
 
@@ -340,6 +349,9 @@ class DepointerNode(ASTNode):  # TODO: llvm
 
     def processToken(self, token):
         self.depointer += token
+
+    def text(self):
+        return self.depointer
 
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.depointer + '"];\n'
@@ -377,6 +389,9 @@ class TypeNameNode(ASTNode):
 
     def processToken(self, token):
         self.typename += token
+
+    def text(self):
+        return self.typename
 
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.typename + '"];\n'
@@ -704,9 +719,11 @@ class IntValueNode(ValueNode):
             return
         self.value = int(token)
 
+    def text(self):
+        return ('-' if self.sign < 0 else '') + str(self.value)
+
     def dotRepresentation(self):
-        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + \
-               ('-' if self.sign < 0 else '') + str(self.value) + '"];\n'
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.text() + '"];\n'
 
     def type(self):
         return 'int'
@@ -735,9 +752,11 @@ class FloatValueNode(ValueNode):
             self.fraction = int(token)
             self.value = float(str(self.integer) + '.' + str(self.fraction))
 
+    def text(self):
+        return ('-' if self.sign < 0 else '') + str(self.value)
+
     def dotRepresentation(self):
-        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + \
-               ('-' if self.sign < 0 else '') + str(self.value) + '"];\n'
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.text() + '"];\n'
 
     def type(self):
         return 'float'
@@ -747,6 +766,9 @@ class CharValueNode(ValueNode):
 
     def processToken(self, token):
         self.value = token[1]
+
+    def text(self):
+        return self.value
 
     def type(self):
         return 'char'
@@ -864,6 +886,14 @@ class OperationNode(ASTNode):
 
     def processToken(self, token):
         self.operator = token
+
+    def text(self):
+        text = ''
+        for child in self.children:
+            text += child.text()
+            if child != self.children[-1]:
+                text += self.operator
+        return text
 
     def canMerge(self, node):
         return ASTNode.canMerge(self, node) and node.operator == self.operator
@@ -1107,6 +1137,9 @@ class IdentifierNode(ASTNode):
 
     def processToken(self, token):
         self.identifier = token
+
+    def text(self):
+        return self.identifier
 
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.identifier + '"];\n'
