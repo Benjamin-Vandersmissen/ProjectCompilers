@@ -225,7 +225,7 @@ class ProgramNode(ASTNode):
                 if isinstance(child.children[1], IdentifierNode):
                     declarations[child.children[1].identifier] = child
                 else:
-                    declarations[child.child.children[1].children[0].identifier] = child
+                    declarations[child.children[1].children[0].identifier] = child
 
         for child in reversed(self.children):
             if isinstance(child, ConstantAssignmentNode):
@@ -677,7 +677,7 @@ class AssignmentNode(ASTNode):
         llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef), funcDef, file)
 
 
-class ConstantAssignmentNode(AssignmentNode):  # TODO: llvm
+class ConstantAssignmentNode(AssignmentNode):  # TODO: in global scope folden in ConstantDeclaration, rest werkt (ook llvm)
     pass
 
 
@@ -1122,6 +1122,4 @@ class IdentifierNode(ASTNode):
             return symbolTables[-1].getEntry(self.identifier)
 
     def toLLVM(self, file, funcDef=None):
-        if self.identifier == 'x':
-            print("")
         return llvm.getValueOfCVariable(self.identifier, funcDef, file)
