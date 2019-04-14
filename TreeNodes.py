@@ -549,12 +549,15 @@ class FunctionDeclarationNode(ASTNode):
         identifier = self.children[1].identifier
 
         arguments = list()
-        # TODO: recognise arrays as arguments
 
         if len(self.children) > 2:
-            for i in range(0, len(self.children[2].children), 2):
-                argumentType = self.children[2].children[i].typename
-                arguments.append(argumentType)
+            for i in range(0, len(self.children[2].children)):
+                if isinstance(self.children[2].children[i], ArrayTypeNode): # Werkt alleen voor one dimensional arrays
+                    argumentType = self.children[2].children[i].children[0].typename + '*'
+                    arguments.append(argumentType)
+                elif isinstance(self.children[2].children[i], TypeNameNode):
+                    argumentType = self.children[2].children[i].typename
+                    arguments.append(argumentType)
 
         if functionTable.exists(identifier) and not functionTable.signatureExists(typename, identifier, arguments):
             self.throwError("function {} is redeclared with a different signature".format(identifier))
@@ -602,9 +605,19 @@ class FunctionDeclarationNode(ASTNode):
 
 class ArgumentDeclarationListNode(ASTNode):
     def startDFS(self):
-        for i in range(0, len(self.children), 2):
-            typename = self.children[i].typename
-            identifier = self.children[i + 1].identifier
+        for i in range(0, len(self.children)):
+            typename = None
+            identifier = None
+            if isinstance(self.children[i], ArrayTypeNode):  # Werkt alleen voor one dimensional arrays
+                typename = self.children[i].children[0].typename + '*'
+                identifier = self.children[i].children[1].identifier
+            elif isinstance(self.children[i], TypeNameNode):
+                typename = self.children[i].typename
+                identifier = self.children[i+1].identifier
+
+            if typename is None:
+                continue
+
             if identifier in reservedWords:
                 self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
             symbolTables[-1].addSymbol(typename, identifier)
@@ -1128,6 +1141,9 @@ class ConstantProductNode(ProductNode):
     def startDFS(self):
         self.foldExpression()
 
+
+class ArrayTypeNode(ASTNode):
+    pass
 
 class IdentifierNode(ASTNode):
 

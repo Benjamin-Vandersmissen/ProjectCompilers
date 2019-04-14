@@ -87,8 +87,12 @@ constantArrayList
         : (constantExpression COMMA)* constantExpression
         ;
 
+arrayType
+        : typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE
+        ;
+
 argumentDeclarationList
-        : (typeName (identifier(OPEN_SQUARE CLOSE_SQUARE)?)? COMMA)* typeName(OPEN_SQUARE CLOSE_SQUARE)? identifier?
+        : ((typeName identifier | arrayType) COMMA)* (typeName identifier | arrayType)
         ;
 
 functionDeclaration

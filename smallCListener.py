@@ -224,6 +224,15 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#arrayType.
+    def enterArrayType(self, ctx:smallCParser.ArrayTypeContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#arrayType.
+    def exitArrayType(self, ctx:smallCParser.ArrayTypeContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#argumentDeclarationList.
     def enterArgumentDeclarationList(self, ctx:smallCParser.ArgumentDeclarationListContext):
         pass
