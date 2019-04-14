@@ -908,6 +908,8 @@ class SumNode(OperationNode):
         self.throwError('Invalid types for binary operator {} : {}, {}'.format(self.operator, type1, type2))
 
     def mergeType(self, type1, type2):
+        if type1 == type2:
+            return type1
         if type1 in ['char', 'int'] and type2 in ['int', 'float']:
             return type2
         if type1 in ['int', 'float'] and type2 in ['char', 'int']:
@@ -956,6 +958,8 @@ class ProductNode(OperationNode):
         self.throwError('Invalid types for binary operator {} : {}, {}'.format(self.operator, type1, type2))
 
     def mergeType(self, type1, type2):
+        if type1 == type2:
+            return type1
         if type1 in ['char', 'int'] and type2 in ['int', 'float']:
             return type2
         if type1 in ['int', 'float'] and type2 in ['char', 'int']:
@@ -1069,7 +1073,6 @@ class ConstantProductNode(ProductNode):
             child = self.children[index]
             if isinstance(child, ConstantSumNode) or isinstance(child, ConstantProductNode):
                 child.foldExpression()
-                test = 0
                 child = self.children[index]
             if value is None:
                 value = child.value
