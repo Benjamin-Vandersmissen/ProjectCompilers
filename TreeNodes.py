@@ -271,6 +271,10 @@ class CodeBodyNode(ASTNode):
         file.write("}\n")
 
 
+class StatementNode(ASTNode):
+    pass
+
+
 class ReturnStatementNode(ASTNode):
     def toLLVM(self, file, funcDef=None):
         if len(self.children) == 0:
