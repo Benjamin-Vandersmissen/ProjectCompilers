@@ -23,7 +23,7 @@ statement
         ;
 
 returnStatement
-        : RETURN (assignment|expression)?
+        : RETURN (assignment|constantExpression|expression)?
         ;
 
 constantExpression
