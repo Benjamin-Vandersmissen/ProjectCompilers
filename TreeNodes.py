@@ -108,12 +108,14 @@ functionTable = FunctionTableNode()
 
 
 class ASTNode(TreeNode):
+    count = 0
 
     def __init__(self):
         TreeNode.__init__(self)
         self.symbolTable = None
         self.functionTable = None
-        self.id = 0
+        self.id = type(self).count
+        type(self).count += 1
         self.line = 0
         self.column = 0
 
@@ -210,6 +212,24 @@ class ProgramNode(ASTNode):
         global symbolTables, functionTable
         self.symbolTable = symbolTables.pop()
         self.functionTable = functionTable
+
+        # Optimise global assignments and declarations
+
+        declarations = dict()
+        for child in self.children:
+            if isinstance(child, ConstantDeclarationNode):
+                declarations[child.children[1].identifier] = child
+
+        for child in reversed(self.children):
+            if isinstance(child, ConstantAssignmentNode):
+                identifier = child.children[0].identifier
+                if identifier in declarations:
+                    node = declarations[identifier]
+                    node.children[1] = child
+                    child.parent = node
+                    declarations.pop(identifier)
+                self.children.remove(child)
+
 
     def processToken(self, token):
         if token == '#include <stdio.h>':
@@ -548,7 +568,9 @@ class FunctionDefinitionNode(ASTNode):
         newSymbolTable = SymbolTableNode()
         symbolTables[-1].add(newSymbolTable)
         symbolTables.append(newSymbolTable)
-
+        
+        # TODO: check return type values
+        
     def endDFS(self):
         # symbol table is finished, pop from stack
         identifier = self.children[0].children[1].identifier
@@ -823,7 +845,6 @@ class ConstantSumNode(SumNode):
             child = self.children[index]
             if isinstance(child, ConstantSumNode) or isinstance(child, ConstantProductNode):
                 child.foldExpression()
-                test = 0
                 child = self.children[index]
             if value is None:
                 value = child.value
