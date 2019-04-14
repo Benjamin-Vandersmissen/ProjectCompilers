@@ -1,5 +1,12 @@
 import struct
 
+# Class that looks like file object
+class FileLookALike():
+    def __init__(self):
+        self.text = ''
+
+    def write(self, text):
+        self.text += text
 
 # Change the format from a float to a hexadecimal number
 def float_to_hex(f):
@@ -23,6 +30,9 @@ def checkTypeAndAlign(typename):
         align = 'OK'
     elif typename == 'i1':
         typename = 'i1'
+        align = 'OK'
+    elif typename == 'label':
+        typename = 'label'
         align = 'OK'
     else:
         raise Exception('Unknown type found in function checkTypeAndAlign!')
@@ -50,7 +60,10 @@ def valueTransformer(typename, value):
         if isinstance(value, int):
             return str(float_to_hex(float(value))) + '00000000'
         elif isinstance(value, str):
-            return str(float_to_hex(float(ord(value)))) + '00000000'
+            if value[0] == '0' and value[-8:len(value)] == '00000000':
+                return value
+            else:
+                return str(float_to_hex(float(ord(value)))) + '00000000'
         elif isinstance(value, float):
             return str(float_to_hex(value)) + '00000000'
 
@@ -69,7 +82,9 @@ def changeLLVMType(targetType, varName, funcDef, file):
     if targetType != typeAndAlign[0]:
         # %4 = trunc i32 %3 to i8
         operation = 'ERROR'
+        originalTargetType = 'ERROR'
         if typeAndAlign[0] == 'i1':
+            originalTargetType = targetType
             targetType = 'i32'
             operation = 'zext'
         elif typeAndAlign[0] == 'i32':
@@ -99,7 +114,10 @@ def changeLLVMType(targetType, varName, funcDef, file):
         localNumber = funcDef.getLocalNumber(checkTypeAndAlign(targetType))
         file.write('%' + str(localNumber) + ' = ' + str(operation) + ' ' + str(typeAndAlign[0]) + ' ' + str(varName) + ' to ' + str(
             targetType) + '\n')
-        return '%' + str(localNumber)
+        if typeAndAlign[0] == 'i1':
+            return changeLLVMType(originalTargetType, '%' + str(localNumber), funcDef, file)
+        else:
+            return '%' + str(localNumber)
     else:
         return varName
 
@@ -167,7 +185,7 @@ def getLLVMTypeOfLLVMVariable(varName, funcDef):
 def writeLLVMOperation(llvmOperator, llvmReturnType, operands, funcDef, file, comparison=False):
     cur = operands[0]
     for i in range(1, len(operands)):
-        if isinstance(cur, str):
+        if isinstance(cur, str) and cur[0] != '0' and cur[-8:len(cur)] != '00000000':
             temp = changeLLVMType(llvmReturnType, cur, funcDef, file)
         else:
             temp = valueTransformer(llvmReturnType, cur)
@@ -180,8 +198,6 @@ def writeLLVMOperation(llvmOperator, llvmReturnType, operands, funcDef, file, co
         file.write('%' + str(localNumber) + ' = ' + str(llvmOperator) + ' ' + str(llvmReturnType) + ' ' + str(
             temp) + ', ' + str(cur) + "\n")
         cur = '%' + str(localNumber)
-        if comparison:
-            cur = changeLLVMType(llvmReturnType, cur, funcDef, file)
     return cur
 
 #  java -jar antlr-4.7.2-complete.jar -Dlanguage=Python3 smallC.g4 -visitor

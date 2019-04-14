@@ -11,7 +11,7 @@ globalDeclaration
         ;
 
 codeBody
-        : OPEN_CURLY ((statement? SEMICOLON|ifStatement elseStatement?|whileStatement))* CLOSE_CURLY
+        : OPEN_CURLY ((statement? SEMICOLON|ifStatement|whileStatement))* CLOSE_CURLY
         ;
 
 statement
@@ -42,7 +42,7 @@ expression
         ;
 
 ifStatement
-        : IF OPEN_BRACKET (typeName? assignment|expression) CLOSE_BRACKET (statement SEMICOLON|codeBody)
+        : IF OPEN_BRACKET (assignment|expression) CLOSE_BRACKET (statement SEMICOLON|codeBody) elseStatement?
         ;
 
 elseStatement

@@ -46,7 +46,8 @@ class customListener(smallCListener):
 
         if len(self.AST.children) == 1 and self.AST.parent is not None \
                 and not isinstance(self.AST, ReturnStatementNode) and not isinstance(self.AST, ArrayListNode) and \
-                not isinstance(self.AST, ConstantArrayListNode) and not isinstance(self.AST, ArgumentListNode) and not isinstance(self.AST, CodeBodyNode):
+                not isinstance(self.AST, ConstantArrayListNode) and not isinstance(self.AST, ArgumentListNode) and \
+                not isinstance(self.AST, CodeBodyNode) and not isinstance(self.AST, ElseStatementNode):
             self.AST.parent.add(self.AST.children[0])
             self.AST.parent.children.remove(self.AST)
 
