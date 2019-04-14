@@ -47,7 +47,7 @@ class customListener(smallCListener):
         if len(self.AST.children) == 1 and self.AST.parent is not None \
                 and not isinstance(self.AST, ReturnStatementNode) and not isinstance(self.AST, ArrayListNode) and \
                 not isinstance(self.AST, ConstantArrayListNode) and not isinstance(self.AST, ArgumentListNode) and \
-                not isinstance(self.AST, CodeBodyNode) and not isinstance(self.AST, ElseStatementNode):
+                not isinstance(self.AST, CodeBodyNode) and not isinstance(self.AST, ElseStatementNode) and not isinstance(self.AST, ArgumentDeclarationListNode):
             self.AST.parent.add(self.AST.children[0])
             self.AST.parent.children.remove(self.AST)
 
@@ -256,6 +256,14 @@ class customListener(smallCListener):
 
     # Exit a parse tree produced by smallCParser#constantArrayList.
     def exitConstantArrayList(self, ctx: smallCParser.ConstantArrayListContext):
+        self.popStack()
+
+    # Enter a parse tree produced by smallCParser#arrayType.
+    def enterArrayType(self, ctx:smallCParser.ArrayTypeContext):
+        self.generateBranch(ArrayTypeNode(), ctx)
+
+    # Exit a parse tree produced by smallCParser#arrayType.
+    def exitArrayType(self, ctx:smallCParser.ArrayTypeContext):
         self.popStack()
 
     # Enter a parse tree produced by smallCParser#argumentDeclarationList.

@@ -129,6 +129,11 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by smallCParser#arrayType.
+    def visitArrayType(self, ctx:smallCParser.ArrayTypeContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#argumentDeclarationList.
     def visitArgumentDeclarationList(self, ctx:smallCParser.ArgumentDeclarationListContext):
         return self.visitChildren(ctx)

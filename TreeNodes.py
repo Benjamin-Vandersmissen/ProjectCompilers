@@ -252,6 +252,12 @@ class CodeBodyNode(ASTNode):
         symbolTables[-1].add(newSymbolTable)
         symbolTables.append(newSymbolTable)
 
+        # Remove unused expressions
+        for child in self.children:
+            if isinstance(child, OperationNode):
+                child.printWarning("Unused expression: {}".format(child.text()))
+                self.children.remove(child)
+
     def endDFS(self):
         # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
@@ -325,6 +331,9 @@ class DereferenceNode(ASTNode):  # TODO: llvm
     def processToken(self, token):
         self.dereference += token
 
+    def text(self):
+        return str(self.dereference)
+
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.dereference + '"];\n'
 
@@ -341,6 +350,9 @@ class DepointerNode(ASTNode):  # TODO: llvm
 
     def processToken(self, token):
         self.depointer += token
+
+    def text(self):
+        return self.depointer
 
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.depointer + '"];\n'
@@ -445,6 +457,9 @@ class TypeNameNode(ASTNode):
 
     def processToken(self, token):
         self.typename += token
+
+    def text(self):
+        return self.typename
 
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.typename + '"];\n'
@@ -602,12 +617,15 @@ class FunctionDeclarationNode(ASTNode):
         identifier = self.children[1].identifier
 
         arguments = list()
-        # TODO: recognise arrays as arguments
 
         if len(self.children) > 2:
-            for i in range(0, len(self.children[2].children), 2):
-                argumentType = self.children[2].children[i].typename
-                arguments.append(argumentType)
+            for i in range(0, len(self.children[2].children)):
+                if isinstance(self.children[2].children[i], ArrayTypeNode): # Werkt alleen voor one dimensional arrays
+                    argumentType = self.children[2].children[i].children[0].typename + '*'
+                    arguments.append(argumentType)
+                elif isinstance(self.children[2].children[i], TypeNameNode):
+                    argumentType = self.children[2].children[i].typename
+                    arguments.append(argumentType)
 
         if functionTable.exists(identifier) and not functionTable.signatureExists(typename, identifier, arguments):
             self.throwError("function {} is redeclared with a different signature".format(identifier))
@@ -655,9 +673,19 @@ class FunctionDeclarationNode(ASTNode):
 
 class ArgumentDeclarationListNode(ASTNode):
     def startDFS(self):
-        for i in range(0, len(self.children), 2):
-            typename = self.children[i].typename
-            identifier = self.children[i + 1].identifier
+        for i in range(0, len(self.children)):
+            typename = None
+            identifier = None
+            if isinstance(self.children[i], ArrayTypeNode):  # Werkt alleen voor one dimensional arrays
+                typename = self.children[i].children[0].typename + '*'
+                identifier = self.children[i].children[1].identifier
+            elif isinstance(self.children[i], TypeNameNode):
+                typename = self.children[i].typename
+                identifier = self.children[i+1].identifier
+
+            if typename is None:
+                continue
+
             if identifier in reservedWords:
                 self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
             symbolTables[-1].addSymbol(typename, identifier)
@@ -772,9 +800,11 @@ class IntValueNode(ValueNode):
             return
         self.value = int(token)
 
+    def text(self):
+        return ('-' if self.sign < 0 else '') + str(self.value)
+
     def dotRepresentation(self):
-        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + \
-               ('-' if self.sign < 0 else '') + str(self.value) + '"];\n'
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.text() + '"];\n'
 
     def type(self):
         return 'int'
@@ -803,9 +833,11 @@ class FloatValueNode(ValueNode):
             self.fraction = int(token)
             self.value = float(str(self.integer) + '.' + str(self.fraction))
 
+    def text(self):
+        return ('-' if self.sign < 0 else '') + str(self.value)
+
     def dotRepresentation(self):
-        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + \
-               ('-' if self.sign < 0 else '') + str(self.value) + '"];\n'
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.text() + '"];\n'
 
     def type(self):
         return 'float'
@@ -815,6 +847,9 @@ class CharValueNode(ValueNode):
 
     def processToken(self, token):
         self.value = token[1]
+
+    def text(self):
+        return self.value
 
     def type(self):
         return 'char'
@@ -932,6 +967,14 @@ class OperationNode(ASTNode):
 
     def processToken(self, token):
         self.operator = token
+
+    def text(self):
+        text = ''
+        for child in self.children:
+            text += child.text()
+            if child != self.children[-1]:
+                text += self.operator
+        return text
 
     def canMerge(self, node):
         return ASTNode.canMerge(self, node) and node.operator == self.operator
@@ -1174,6 +1217,9 @@ class ConstantProductNode(ProductNode):
         self.foldExpression()
 
 
+class ArrayTypeNode(ASTNode):
+    pass
+
 class IdentifierNode(ASTNode):
 
     def __init__(self):
@@ -1182,6 +1228,9 @@ class IdentifierNode(ASTNode):
 
     def processToken(self, token):
         self.identifier = token
+
+    def text(self):
+        return self.identifier
 
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.identifier + '"];\n'
