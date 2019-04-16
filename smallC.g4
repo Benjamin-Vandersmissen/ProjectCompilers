@@ -11,11 +11,12 @@ globalDeclaration
         ;
 
 codeBody
-        : OPEN_CURLY ((statement? SEMICOLON|ifStatement|whileStatement))* CLOSE_CURLY
+        : OPEN_CURLY ((statement? SEMICOLON|ifStatement|whileStatement|codeBody))* CLOSE_CURLY
         ;
 
 statement
-        : assignment
+        : constantAssignment
+        | assignment
         | declaration
         | constantExpression
         | expression
@@ -50,7 +51,7 @@ elseStatement
         ;
         
 whileStatement
-        : WHILE OPEN_BRACKET (expression|typeName? assignment) CLOSE_BRACKET (statement SEMICOLON|codeBody)
+        : WHILE OPEN_BRACKET (expression|assignment) CLOSE_BRACKET (statement SEMICOLON|codeBody)
         ;
 
 typeName 

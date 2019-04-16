@@ -15,7 +15,17 @@ def float_to_hex(f):
 
 # Cast the C type to the correct format for llvm and gives the align number
 def checkTypeAndAlign(typename):
+    # Check if pointer if so take type and save amount of stars
+    startPointerIndex = 'No pointer'
+    typeNameLastIndex = len(typename) - 1
+    for i in range(len(typename)):
+        if typename[i] == '*':
+            startPointerIndex = i
+            break
+    if startPointerIndex != 'No pointer':
+        typename = typename[0:startPointerIndex]
     align = 'ERROR'
+    # Check the type
     if typename == 'int' or typename == 'i32':
         typename = 'i32'
         align = '4'
@@ -31,11 +41,16 @@ def checkTypeAndAlign(typename):
     elif typename == 'i1':
         typename = 'i1'
         align = 'OK'
-    elif typename == 'label':
-        typename = 'label'
+    elif typename == 'return':
+        typename = 'return'
         align = 'OK'
     else:
-        raise Exception('Unknown type found in function checkTypeAndAlign!')
+        raise Exception('Unknown type "' + str(typename) + '"found in function checkTypeAndAlign!')
+    # If a pointer add the stars to the type
+    if startPointerIndex != 'No pointer':
+        for _ in range(typeNameLastIndex - startPointerIndex + 1):
+            typename += '*'
+            align = '8'
 
     return typename, align
 
@@ -125,9 +140,9 @@ def changeLLVMType(targetType, varName, funcDef, file):
 # Create the right llvm code to get the value of the searched C variable in the right llvm type and returns the llvm variable name
 # expects varName to be an C varable name, better known as the identifier member
 # expects wantedType to be an llvmType
-def getValueOfCVariable(varName, funcDef, file):
-    if varName in funcDef.counterTable:  # If the wanted variable is a local variable
-        localNumber = funcDef.counterTable[varName]
+def getValueOfCVariable(varName, funcDef, codeBody, file):
+    if varName in codeBody.counterTable:  # If the wanted variable is a local variable
+        localNumber = codeBody.counterTable[varName]
         typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
         varName = '%' + str(localNumber)
     else:  # If the wanted variable is a global variable
@@ -141,9 +156,9 @@ def getValueOfCVariable(varName, funcDef, file):
 
 # Get the llvm type of a C variable
 # expects varName to be an C varable name, better known as the identifier member
-def getLLVMTypeOfCVariable(varName, funcDef):
-    if varName in funcDef.counterTable:  # If the wanted variable is a local variable
-        localNumber = funcDef.counterTable[varName]
+def getLLVMTypeOfCVariable(varName, funcDef, codeBody):
+    if varName in codeBody.counterTable:  # If the wanted variable is a local variable
+        localNumber = codeBody.counterTable[varName]
         typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
     else:  # If the wanted variable is a global variable
         typeAndAlign = funcDef.parent.typeAndAlignTable[varName]
@@ -153,15 +168,18 @@ def getLLVMTypeOfCVariable(varName, funcDef):
 # Store the value of an llvm variable in a llvm variable representing a C variable
 # expects varName to be a C variable or better known as identifier
 # expects valueVar to be an llvm varibale, better know as %1 or @a
-def writeLLVMStoreForCVariable(varName, valueVar, funcDef, file):
-    if varName in funcDef.counterTable:  # If the wanted variable is a local variable
-        localNumber = funcDef.counterTable[varName]
+def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):  # TODO: aanpassen met codeBody in de nodes
+    if varName in codeBody.counterTable:  # If the wanted variable is a local variable
+        localNumber = codeBody.counterTable[varName]
         typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
         varName = '%' + str(localNumber)
     else:  # If the wanted variable is a global variable
         typeAndAlign = funcDef.parent.typeAndAlignTable[varName]
         varName = '@' + str(varName)
-    changeLLVMType(typeAndAlign[0], valueVar, funcDef, file)
+    if not (isinstance(valueVar, str) and (valueVar[0] == '%' or valueVar[0] == '@')):
+        valueVar = valueTransformer(typeAndAlign[0], valueVar)
+    else:
+        valueVar = changeLLVMType(typeAndAlign[0], valueVar, funcDef, file)
     # store i32 %2, i32* %1, align 4
     file.write('store ' + str(typeAndAlign[0]) + ' ' + str(valueVar) + ', ' + str(typeAndAlign[0]) + '* ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
 
@@ -199,5 +217,27 @@ def writeLLVMOperation(llvmOperator, llvmReturnType, operands, funcDef, file, co
             temp) + ', ' + str(cur) + "\n")
         cur = '%' + str(localNumber)
     return cur
+
+# Returns the register which has as value a bool which is the result of the comparison between the statement and 0
+def writeLLVMCompareWithZero(resultLLVMVar, funcDef, file):  # TODO: llvm: compatible met constants (misschien al verkleinen in AST?)
+    # if isinstance(self.children[0], ValueNode): # or child.__class__.__name__[0:8] == 'Constant':
+    #     llvmTokens.append(llvm.valueTransformer(llvmReturnType, child.value))
+    # else:
+    #     llvmTokens.append(llvm.changeLLVMType(llvmReturnType, child.toLLVM(file, funcDef, codeBody), funcDef, file))
+    typeResult = getLLVMTypeOfLLVMVariable(resultLLVMVar, funcDef)
+    operator = 'ERROR'
+    if typeResult == 'i32':
+        operator = 'icmp ne'
+    elif typeResult == 'i8':
+        operator = 'icmp ne'
+    elif typeResult == 'float':
+        operator = 'fcmp une'
+    else:
+        raise Exception('Unknown type "' + str(typeResult) + '" found!')
+    typeAndAlign = checkTypeAndAlign('i1')
+    localNumber = funcDef.getLocalNumber(typeAndAlign)
+    # %5 = icmp ne i32 %4, 0
+    file.write('%' + str(localNumber) + ' = ' + str(operator) + ' ' + str(typeResult) + ' ' + str(resultLLVMVar) + ', 0\n')
+    return '%' + str(localNumber)
 
 #  java -jar antlr-4.7.2-complete.jar -Dlanguage=Python3 smallC.g4 -visitor
