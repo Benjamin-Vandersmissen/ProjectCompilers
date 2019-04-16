@@ -93,7 +93,7 @@ arrayType
         ;
 
 argumentDeclarationList
-        : ((typeName identifier | arrayType) COMMA)* (typeName identifier | arrayType)
+        : ((typeName identifier? | arrayType) COMMA)* (typeName identifier? | arrayType)
         ;
 
 functionDeclaration
@@ -146,6 +146,7 @@ constant
         | floatValue
         | charValue
         | OPEN_BRACKET constantExpression CLOSE_BRACKET
+        | dereference //Only for references to global variables, check in AST
         ;
 
 identifier

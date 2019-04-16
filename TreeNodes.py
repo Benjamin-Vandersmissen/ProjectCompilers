@@ -263,6 +263,9 @@ class CodeBodyNode(ASTNode):
                 child.printWarning("Unused expression: {}".format(child.text()))
                 self.children.remove(child)
 
+    def canMerge(self, node):
+        return False
+
     def endDFS(self):
         # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
@@ -660,9 +663,13 @@ class FunctionDeclarationNode(ASTNode):
 
         if len(self.children) > 2:
             for i in range(0, len(self.children[2].children)):
-                if isinstance(self.children[2].children[i], ArrayTypeNode): # Werkt alleen voor one dimensional arrays
+                if isinstance(self.children[2].children[i], ArrayTypeNode):  # Werkt alleen voor one dimensional arrays
                     argumentType = self.children[2].children[i].children[0].typename + '*'
                     arguments.append(argumentType)
+                    if i == len(self.children)-1 or not isinstance(self.children[2].children[i+1], IdentifierNode) and \
+                            isinstance(self.parent, FunctionDefinitionNode):
+                        self.children[2].children[i].throwError("Parameter name omitted")
+
                 elif isinstance(self.children[2].children[i], TypeNameNode):
                     argumentType = self.children[2].children[i].typename
                     arguments.append(argumentType)
@@ -821,8 +828,11 @@ class ValueNode(ASTNode):
         ASTNode.__init__(self)
         self.value = None
 
+    def text(self):
+        return ''
+
     def dotRepresentation(self):
-        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + str(self.value) + '"];\n'
+        return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.text() + '"];\n'
 
 
 class IntValueNode(ValueNode):
@@ -891,7 +901,7 @@ class CharValueNode(ValueNode):
         self.value = token[1]
 
     def text(self):
-        return self.value
+        return "'" + self.value + "'"
 
     def type(self):
         return 'char'
@@ -1201,7 +1211,10 @@ class ConstantSumNode(SumNode):
                 child.foldExpression()
                 child = self.children[index]
             if value is None:
-                value = child.value
+                if isinstance(child.value, str):
+                    value = ord(child.value)
+                else:
+                    value = child.value
             elif self.operator == '+':
                 if isinstance(child.value, str):
                     value += ord(child.value)
@@ -1216,12 +1229,14 @@ class ConstantSumNode(SumNode):
         index = self.parent.children.index(self)
         if type == 'float':
             self.parent.children[index] = FloatValueNode()
+            self.parent.children[index].value = float(value)
         if type == 'int':
             self.parent.children[index] = IntValueNode()
+            self.parent.children[index].value = int(value)
         if type == 'char':
             self.parent.children[index] = CharValueNode()
+            self.parent.children[index].value = chr(int(value) % 256)
 
-        self.parent.children[index].value = value
         self.parent.children[index].parent = self.parent
 
     def startDFS(self):
