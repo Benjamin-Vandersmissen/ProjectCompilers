@@ -12,19 +12,22 @@ class FileLookALike():
 def float_to_hex(f):
     return hex(struct.unpack('<I', struct.pack('<f', f))[0])
 
+# Check if type is pointer, if so returns the amount of pointers
+def isPointer(typename):
+    if typename[-1] == '*':
+        amount = 0
+        for i in range(len(typename)):
+            if typename[i] == '*':
+                amount += 1
+        return amount
+    return 0
 
 # Cast the C type to the correct format for llvm and gives the align number
 def checkTypeAndAlign(typename):
     # Check if pointer if so take type and save amount of stars
-    startPointerIndex = 'No pointer'
-    typeNameLastIndex = len(typename) - 1
-    for i in range(len(typename)):
-        if typename[i] == '*':
-            startPointerIndex = i
-            break
-    if startPointerIndex != 'No pointer':
-        typename = typename[0:startPointerIndex]
-    align = 'ERROR'
+    pointerAmount = isPointer(typename)
+    if pointerAmount != 0:
+        typename = typename[0:(-pointerAmount)]
     # Check the type
     if typename == 'int' or typename == 'i32':
         typename = 'i32'
@@ -47,16 +50,16 @@ def checkTypeAndAlign(typename):
     else:
         raise Exception('Unknown type "' + str(typename) + '"found in function checkTypeAndAlign!')
     # If a pointer add the stars to the type
-    if startPointerIndex != 'No pointer':
-        for _ in range(typeNameLastIndex - startPointerIndex + 1):
+    if pointerAmount != 0:
+        for _ in range(pointerAmount):
             typename += '*'
-            align = '8'
+        align = '8'
 
     return typename, align
 
 
 # Cast the C value to the correct format for llvm
-def valueTransformer(typename, value):
+def valueTransformer(typename, value):  # TODO: llvm: als float al in hex staat en hierin komt, wordt het dan niet een char? werkt dit, zo niet aanpassen dat hex eerst float wordt!
     if typename == 'int' or typename == 'i32':
         if isinstance(value, int):
             return value
@@ -81,66 +84,108 @@ def valueTransformer(typename, value):
                 return str(float_to_hex(float(ord(value)))) + '00000000'
         elif isinstance(value, float):
             return str(float_to_hex(value)) + '00000000'
+    else:
+        raise Exception('Unknown typename "' + str(typename) + '" given in valueTransformer!')
 
 
 # Create the right llvm code to change a type of the value of an llvm variable and returns the llvm variable name
 # expects targetType to be an llvmType
 # expects varName in form of %1 or @a  (llvm)
-def changeLLVMType(targetType, varName, funcDef, file):
-    if varName[0] == '%':
-        typeAndAlign = funcDef.typeAndAlignTable[varName[1:len(varName)]]
-    elif varName[0] == '@':
-        typeAndAlign = funcDef.parent.typeAndAlignTable[varName[1:len(varName)]]
-    else:
-        raise Exception('The given variable name "' + str(varName) + '" isn\'t an llvm variable name!')
-
+def changeLLVMType(targetType, varName, funcDef, file):  # TODO: llvm: add i64 for every type + finish if var is pointer
+    if isinstance(varName, str):
+        if varName[0] == '%':
+            typeAndAlign = funcDef.typeAndAlignTable[varName[1:len(varName)]]
+        elif varName[0] == '@':
+            typeAndAlign = funcDef.parent.typeAndAlignTable[varName[1:len(varName)]]
+        else:
+            raise Exception('Unknown type of llvm variable: ' + str(varName))
+    else:  # No variable means a value
+        return valueTransformer(targetType, varName)
+    # Change to type of the value to the target type
     if targetType != typeAndAlign[0]:
-        # %4 = trunc i32 %3 to i8
-        operation = 'ERROR'
+        varType = typeAndAlign[0]
         originalTargetType = 'ERROR'
-        if typeAndAlign[0] == 'i1':
+        if isPointer(varType[0]):  # If the variable is already a pointer
+            if isPointer(targetType):  # If target type is a pointer
+                operation = 'bitcast'
+            elif targetType == 'i64':
+                operation = 'ptrtoint'
+            else:
+                raise Exception('Unknown target type "' + str(varType) + '" in the function changeLLVMType!')
+        elif varType == 'i1':
             originalTargetType = targetType
             targetType = 'i32'
             operation = 'zext'
-        elif typeAndAlign[0] == 'i32':
-            if targetType == 'i8':
+        elif varName == 'i64':
+            if isPointer(targetType):
+                operation = 'inttoptr'
+        elif varType == 'i32':
+            if isPointer(targetType):  # If target type is a pointer
+                operation = 'bitcast'
+                varType = 'i32*'
+            elif targetType == 'i8':
                 operation = 'trunc'
             elif targetType == 'float':
                 operation = 'sitofp'
+            elif targetType == 'i64':
+                operation = 'sext'
             else:
-                raise Exception('Unknown target type "' + str(typeAndAlign[0]) + '" in the function changeLLVMType!')
-        elif typeAndAlign[0] == 'i8':
-            if targetType == 'i32':
+                raise Exception('Unknown target type "' + str(varType) + '" in the function changeLLVMType!')
+        elif varType == 'i8':
+            if isPointer(targetType):
+                operation = 'bitcast'
+                varType = 'i8*'
+            elif targetType == 'i32':
                 operation = 'sext'
             elif targetType == 'float':
                 operation = 'sitofp'
             else:
-                raise Exception('Unknown target type "' + str(typeAndAlign[0]) + '" in the function changeLLVMType!')
-        elif typeAndAlign[0] == 'float':
-            if targetType == 'i32':
+                raise Exception('Unknown target type "' + str(varType) + '" in the function changeLLVMType!')
+        elif varType == 'float':
+            if isPointer(targetType):
+                operation = 'bitcast'
+                varType = 'float*'
+            elif targetType == 'i32':
                 operation = 'fptosi'
             elif targetType == 'i8':
                 operation = 'fptosi'
             else:
-                raise Exception('Unknown target type "' + str(typeAndAlign[0]) + '" in the function changeLLVMType!')
+                raise Exception('Unknown target type "' + str(varType) + '" in the function changeLLVMType!')
         else:
-            raise Exception('Unknown type "' + str(typeAndAlign[0]) + '" for variable "' + str(varName) + '" in the function changeLLVMType!')
+            raise Exception('Unknown type "' + str(varType) + '" for variable "' + str(varName) + '" in the function changeLLVMType!')
 
         localNumber = funcDef.getLocalNumber(checkTypeAndAlign(targetType))
-        file.write('%' + str(localNumber) + ' = ' + str(operation) + ' ' + str(typeAndAlign[0]) + ' ' + str(varName) + ' to ' + str(
+        # %4 = trunc i32 %3 to i8
+        file.write('%' + str(localNumber) + ' = ' + str(operation) + ' ' + str(varType) + ' ' + str(varName) + ' to ' + str(
             targetType) + '\n')
-        if typeAndAlign[0] == 'i1':
+        if varType == 'i1':
             return changeLLVMType(originalTargetType, '%' + str(localNumber), funcDef, file)
         else:
             return '%' + str(localNumber)
     else:
         return varName
+        
+
+# Create the right llvm code to get the value of the searched C or llvm variable and returns the llvm variable name
+# expects varName to be an C or llvm variable name
+def getValueOfVariable(varName, funcDef, codeBody, file):
+    if varName[0] == '%':
+        typeAndAlign = funcDef.typeAndAlignTable[varName[1:len(varName)]]
+    elif varName[0] == '@':
+        typeAndAlign = funcDef.parent.typeAndAlignTable[varName[1:len(varName)]]
+    else:
+        temp = getLLVMOfCVarible(varName, funcDef, codeBody)
+        varName = temp[0]
+        typeAndAlign = temp[1]
+    localNumber = funcDef.getLocalNumber(typeAndAlign)
+    # %3 = load i32, i32* <@a/%1>, align 4
+    file.write('%' + str(localNumber) + ' = load ' + str(typeAndAlign[0]) + ', ' + str(typeAndAlign[0]) + '* ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
+    return '%' + str(localNumber)
 
 
-# Create the right llvm code to get the value of the searched C variable in the right llvm type and returns the llvm variable name
+# Returns the llvm variable that represents the C variable
 # expects varName to be an C varable name, better known as the identifier member
-# expects wantedType to be an llvmType
-def getValueOfCVariable(varName, funcDef, codeBody, file):
+def getLLVMOfCVarible(varName, funcDef, codeBody):
     if varName in codeBody.counterTable:  # If the wanted variable is a local variable
         localNumber = codeBody.counterTable[varName]
         typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
@@ -148,10 +193,7 @@ def getValueOfCVariable(varName, funcDef, codeBody, file):
     else:  # If the wanted variable is a global variable
         typeAndAlign = funcDef.parent.typeAndAlignTable[varName]
         varName = '@' + str(varName)
-    localNumber = funcDef.getLocalNumber(typeAndAlign)
-    # %3 = load i32, i32* <@a/%1>, align 4
-    file.write('%' + str(localNumber) + ' = load ' + str(typeAndAlign[0]) + ', ' + str(typeAndAlign[0]) + '* ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
-    return '%' + str(localNumber)
+    return varName, typeAndAlign
 
 
 # Get the llvm type of a C variable
@@ -168,7 +210,7 @@ def getLLVMTypeOfCVariable(varName, funcDef, codeBody):
 # Store the value of an llvm variable in a llvm variable representing a C variable
 # expects varName to be a C variable or better known as identifier
 # expects valueVar to be an llvm varibale, better know as %1 or @a
-def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):  # TODO: aanpassen met codeBody in de nodes
+def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):
     if varName in codeBody.counterTable:  # If the wanted variable is a local variable
         localNumber = codeBody.counterTable[varName]
         typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
