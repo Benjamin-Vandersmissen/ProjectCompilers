@@ -1242,9 +1242,12 @@ class SumNode(OperationNode):
             if isinstance(child, ValueNode):
                 temp.append(child)
 
+        if len(temp) == 0: # niets kan gefold worden
+            return
+
         result = self.mergeOperands(temp)
         result.parent = self
-        if len(temp) != 0 and temp[0] == self.children[0]:
+        if temp[0] == self.children[0]:
             # Result moet eerst in de children
             self.children[0] = result
         else:
