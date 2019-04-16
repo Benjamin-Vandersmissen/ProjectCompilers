@@ -1034,6 +1034,74 @@ class OperationNode(ASTNode):
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.operator + '"];\n'
 
+    def isCompatibleType(self, type1, type2):
+        self.throwError('Invalid types for binary operator {} : {}, {}'.format(self.operator, type1, type2))
+
+    def mergeType(self, tpye1, type2):
+        raise Exception("Not implemented for class {}".format(self.__class__))
+
+    def mergeOperands(self, operands):
+        type = operands[0].type()
+        value = None
+        for node in operands:
+            self.isCompatibleType(type, node.type())
+            type = self.mergeType(type, node.type())
+            if value is None:
+                if isinstance(node, CharValueNode):
+                    value = ord(node.value)
+                else:
+                    value = node.value
+            else:
+                if isinstance(node, CharValueNode):
+                    value = eval("{}{}{}".format(value, self.operator, ord(node.value)))
+                else:
+                    value = eval("{}{}{}".format(value, self.operator, node.value))
+
+        if type == 'float':
+            node = FloatValueNode()
+            node.value = float(value)
+            return node
+        if type == 'int':
+            node = IntValueNode()
+            node.value = int(value)
+            return node
+        if type == 'char':
+            node = CharValueNode()
+            node.value = chr(int(value) % 256)
+            return node
+
+    def foldExpression(self):
+        newChildren = []
+        temp = []
+        for i in range(len(self.children)):
+            if isinstance(self.children[i], ValueNode):
+                temp.append(self.children[i])
+            else:
+                # Continuous constants (temp) can be folded in one constant
+                if len(temp) < 2:  # Don't bother
+                    for node in temp:
+                        newChildren.append(node)
+                    temp = []
+                    newChildren.append(self.children[i])
+                    continue
+                newChildren.append(self.mergeOperands(temp))
+                newChildren.append(self.children[i])
+                temp = []
+        if len(temp) > 0:
+            newChildren.append(self.mergeOperands(temp))
+        self.children.clear()
+        if len(newChildren) == 1:
+            index = self.parent.children.index(self)
+            self.parent.children[index] = newChildren[0]
+            self.parent.children[index].parent = self.parent
+        else:
+            for node in newChildren:
+                self.add(node)
+
+
+    def endDFS(self):
+        self.foldExpression()
+
     def toLLVM(self, file, funcDef=None, codeBody=None):
         llvmTokens = list()
         llvmReturnType = ''
@@ -1101,6 +1169,26 @@ class SumNode(OperationNode):
                 if self.isCompatibleType(type, child.type()):
                     type = self.mergeType(type, child.type())
         return type
+
+    def foldExpression(self):
+        OperationNode.foldExpression(self)
+        temp = []
+        for child in self.children:
+            if isinstance(child, ValueNode):
+                temp.append(child)
+
+        result = self.mergeOperands(temp)
+        result.parent = self.parent
+        if len(temp) != 0 and temp[0] == self.children[0]:
+            # Result moet eerst in de children
+            self.children[0] = result
+        else:
+            # Result moet laatst in de children
+            self.children.append(result)
+
+        for child in self.children:
+            if isinstance(child, ValueNode) and child in temp:
+                self.children.remove(child)
 
     def toLLVM(self, file, funcDef=None, codeBody=None):
         temp = super(SumNode, self).toLLVM(file, funcDef, codeBody)
@@ -1202,76 +1290,11 @@ class ConstantComparisonNode(OperationNode):
 
 
 class ConstantSumNode(SumNode):
-    def foldExpression(self):
-        type = self.type()
-        value = None
-        for index in range(len(self.children)):
-            child = self.children[index]
-            if isinstance(child, ConstantSumNode) or isinstance(child, ConstantProductNode):
-                child.foldExpression()
-                child = self.children[index]
-            if value is None:
-                if isinstance(child.value, str):
-                    value = ord(child.value)
-                else:
-                    value = child.value
-            elif self.operator == '+':
-                if isinstance(child.value, str):
-                    value += ord(child.value)
-                else:
-                    value += child.value
-            elif self.operator == '-':
-                if isinstance(child.value, str):
-                    value -= ord(child.value)
-                else:
-                    value -= child.value
-
-        index = self.parent.children.index(self)
-        if type == 'float':
-            self.parent.children[index] = FloatValueNode()
-            self.parent.children[index].value = float(value)
-        if type == 'int':
-            self.parent.children[index] = IntValueNode()
-            self.parent.children[index].value = int(value)
-        if type == 'char':
-            self.parent.children[index] = CharValueNode()
-            self.parent.children[index].value = chr(int(value) % 256)
-
-        self.parent.children[index].parent = self.parent
-
-    def startDFS(self):
-        self.foldExpression()
+    pass
 
 
 class ConstantProductNode(ProductNode):
-    def foldExpression(self):
-        type = self.type()
-        value = None
-        for index in range(len(self.children)):
-            child = self.children[index]
-            if isinstance(child, ConstantSumNode) or isinstance(child, ConstantProductNode):
-                child.foldExpression()
-                child = self.children[index]
-            if value is None:
-                value = child.value
-            elif self.operator == '*':
-                value *= child.value
-            elif self.operator == '/':
-                value /= child.value
-
-        index = self.parent.children.index(self)
-        if type == 'float':
-            self.parent.children[index] = FloatValueNode()
-        if type == 'int':
-            self.parent.children[index] = IntValueNode()
-        if type == 'char':
-            self.parent.children[index] = CharValueNode()
-
-        self.parent.children[index].value = value
-        self.parent.children[index].parent = self.parent
-
-    def startDFS(self):
-        self.foldExpression()
+    pass
 
 
 class ArrayTypeNode(ASTNode):
@@ -1294,7 +1317,6 @@ class IdentifierNode(ASTNode):
 
     def startDFS(self):
         if not symbolTables[-1].exists(self.identifier) and not functionTable.exists(self.identifier):
-            print(symbolTables[-1].symbolTable)
             raise Exception(
                 "Identifier " + self.identifier + " not found at " + str(self.line) + ":" + str(self.column))
 
