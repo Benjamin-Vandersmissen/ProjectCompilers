@@ -132,6 +132,7 @@ class ASTNode(TreeNode):
 
     def buildSymbolTable(self):
         self.startDFS()
+        test = symbolTables
         for child in self.children:
             child.buildSymbolTable()
 
@@ -650,11 +651,6 @@ class ConstantArrayListNode(ArrayListNode):  # TODO: llvm
 
 class FunctionDeclarationNode(ASTNode):
     def startDFS(self):
-        # build a new symbol table
-        global symbolTables
-        newSymbolTable = SymbolTableNode()
-        symbolTables[-1].add(newSymbolTable)
-        symbolTables.append(newSymbolTable)
 
         typename = self.children[0].typename
         identifier = self.children[1].identifier
@@ -679,15 +675,6 @@ class FunctionDeclarationNode(ASTNode):
 
         functionTable.addFunction(typename, identifier, arguments, False)
 
-    def endDFS(self):
-        # symbol table is finished, pop from stack
-        self.symbolTable = symbolTables.pop()
-
-        # This is a function declaration in a function definition
-        # We need to push all symbolTable entries back a level
-        if len(symbolTables) > 1:
-            symbolTables[-1] = self.symbolTable
-        self.symbolTable = None
 
     def toLLVM(self, file, funcDef=None, codeBody=None):
         typeAndAsign = llvm.checkTypeAndAlign(self.children[0].typename)
@@ -719,23 +706,7 @@ class FunctionDeclarationNode(ASTNode):
 
 
 class ArgumentDeclarationListNode(ASTNode):
-    def startDFS(self):
-        for i in range(0, len(self.children)):
-            typename = None
-            identifier = None
-            if isinstance(self.children[i], ArrayTypeNode):  # Werkt alleen voor one dimensional arrays
-                typename = self.children[i].children[0].typename + '*'
-                identifier = self.children[i].children[1].identifier
-            elif isinstance(self.children[i], TypeNameNode):
-                typename = self.children[i].typename
-                identifier = self.children[i+1].identifier
-
-            if typename is None:
-                continue
-
-            if identifier in reservedWords:
-                self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
-            symbolTables[-1].addSymbol(typename, identifier)
+    pass
 
 
 class FunctionDefinitionNode(ASTNode):
@@ -760,6 +731,27 @@ class FunctionDefinitionNode(ASTNode):
         newSymbolTable = SymbolTableNode()
         symbolTables[-1].add(newSymbolTable)
         symbolTables.append(newSymbolTable)
+
+        if len(self.children[0].children) < 3:  # geen argumenten, dus skip
+            return
+        arguments = self.children[0].children[2]
+
+        for i in range(0, len(arguments.children)):
+            typename = None
+            identifier = None
+            if isinstance(arguments.children[i], ArrayTypeNode):  # Werkt alleen voor one dimensional arrays
+                typename = arguments.children[i].children[0].typename + '*'
+                identifier = arguments.children[i].children[1].identifier
+            elif isinstance(arguments.children[i], TypeNameNode):
+                typename = arguments.children[i].typename
+                identifier = arguments.children[i + 1].identifier
+
+            if typename is None:
+                continue
+
+            if identifier in reservedWords:
+                arguments.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
+            symbolTables[-1].addSymbol(typename, identifier)
         
         # TODO: check return type values
         
@@ -768,6 +760,7 @@ class FunctionDefinitionNode(ASTNode):
         identifier = self.children[0].children[1].identifier
         entry = functionTable.functionTable[identifier]
         functionTable.functionTable[identifier] = (entry[0], entry[1], True)
+        test = symbolTables
         self.symbolTable = symbolTables.pop()
 
     def toLLVM(self, file, funcDef=None, codeBody=None):
@@ -1172,6 +1165,8 @@ class SumNode(OperationNode):
 
     def foldExpression(self):
         OperationNode.foldExpression(self)
+        if len(self.children) == 0: # alles is al gefold door de normale foldExpression
+            return
         temp = []
         for child in self.children:
             if isinstance(child, ValueNode):
@@ -1235,6 +1230,28 @@ class ProductNode(OperationNode):
                 if self.isCompatibleType(type, child.type()):
                     type = self.mergeType(type, child.type())
         return type
+
+    def foldExpression(self):
+        OperationNode.foldExpression(self)
+        if len(self.children) == 0:  # alles is al gefold door de normale foldExpression
+            return
+        temp = []
+        for child in self.children:
+            if isinstance(child, ValueNode):
+                temp.append(child)
+
+        result = self.mergeOperands(temp)
+        result.parent = self.parent
+        if len(temp) != 0 and temp[0] == self.children[0]:
+            # Result moet eerst in de children
+            self.children[0] = result
+        else:
+            # Result moet laatst in de children
+            self.children.append(result)
+
+        for child in self.children:
+            if isinstance(child, ValueNode) and child in temp:
+                self.children.remove(child)
 
     def toLLVM(self, file, funcDef=None, codeBody=None):
         temp = super(ProductNode, self).toLLVM(file, funcDef, codeBody)
