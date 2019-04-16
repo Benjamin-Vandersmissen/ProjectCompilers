@@ -18,6 +18,10 @@ class TreeNode:
         self.children.append(treenode)
         self.children[-1].parent = self
 
+    def addFront(self, treenode):
+        self.children.insert(0, treenode)
+        self.children[0].parent = self
+
 
 class SymbolTableNode(TreeNode):
     def __init__(self):
@@ -143,8 +147,9 @@ class ASTNode(TreeNode):
 
     def merge(self, node):
         node.parent.children.remove(node)
+        self.children = node.children + self.children
         for child in node.children:
-            self.add(child)
+            child.parent = self
 
     def startDFS(self):
         # function for overriding in subclasses
@@ -1086,7 +1091,12 @@ class OperationNode(ASTNode):
     def mergeType(self, tpye1, type2):
         raise Exception("Not implemented for class {}".format(self.__class__))
 
-    def mergeOperands(self, operands):
+    def mergeOperands(self, operands, specialCase=False):
+        # Special case is for divisions of the type ((.../val1)/val2)/...
+        # This needs to be folded to (.../(val1*val2))/...
+        # Divisions of the type (val1/val2)/.. can still be folded the same way as all other operations
+
+
         type = operands[0].type()
         value = None
         for node in operands:
@@ -1098,10 +1108,16 @@ class OperationNode(ASTNode):
                 else:
                     value = node.value
             else:
-                if isinstance(node, CharValueNode):
-                    value = eval("{}{}{}".format(value, self.operator, ord(node.value)))
+                if specialCase and self.operator == '/':
+                    if isinstance(node, CharValueNode):
+                        value = eval("{}*{}".format(value, ord(node.value)))
+                    else:
+                        value = eval("{}*{}".format(value, node.value))
                 else:
-                    value = eval("{}{}{}".format(value, self.operator, node.value))
+                    if isinstance(node, CharValueNode):
+                        value = eval("{}{}{}".format(value, self.operator, ord(node.value)))
+                    else:
+                        value = eval("{}{}{}".format(value, self.operator, node.value))
 
         if type == 'float':
             node = FloatValueNode()
@@ -1130,11 +1146,11 @@ class OperationNode(ASTNode):
                     temp = []
                     newChildren.append(self.children[i])
                     continue
-                newChildren.append(self.mergeOperands(temp))
+                newChildren.append(self.mergeOperands(temp, temp[0] != self.children[0]))
                 newChildren.append(self.children[i])
                 temp = []
         if len(temp) > 0:
-            newChildren.append(self.mergeOperands(temp))
+            newChildren.append(self.mergeOperands(temp, temp[0] != self.children[0]))
         self.children.clear()
         if len(newChildren) == 1:
             index = self.parent.children.index(self)
@@ -1189,8 +1205,10 @@ class SumNode(OperationNode):
         if self.operator == '+' and (type1 in ['int', 'char'] and type2[-1] == '*'
                                      or type1[-1] == '*' and type2 in ['int', 'char']):
             return True
-        if self.operator == '-' and type1[-1] == '*' and type2 in ['int', 'char']:
+        if self.operator == '-' and type1[-1] == '*' and (type2 in ['int', 'char'] or type1 == type2):
             return True
+        if self.operator == '-' and type1[-1] == '*' and type2[-1] == '*':
+            self.throwError('{} and {} are not pointers to compatible types'.format(type1, type2))
         self.throwError('Invalid types for binary operator {} : {}, {}'.format(self.operator, type1, type2))
 
     def mergeType(self, type1, type2):
@@ -1225,7 +1243,7 @@ class SumNode(OperationNode):
                 temp.append(child)
 
         result = self.mergeOperands(temp)
-        result.parent = self.parent
+        result.parent = self
         if len(temp) != 0 and temp[0] == self.children[0]:
             # Result moet eerst in de children
             self.children[0] = result
@@ -1296,7 +1314,7 @@ class ProductNode(OperationNode):
                 temp.append(child)
 
         result = self.mergeOperands(temp)
-        result.parent = self.parent
+        result.parent = self
         if len(temp) != 0 and temp[0] == self.children[0]:
             # Result moet eerst in de children
             self.children[0] = result
