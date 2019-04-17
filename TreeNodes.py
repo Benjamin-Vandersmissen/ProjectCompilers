@@ -425,11 +425,41 @@ class DepointerNode(ASTNode):  # TODO: llvm test
 
 
 class ElseStatementNode(ASTNode):
+    def startDFS(self):
+        if not isinstance(self.children[0], CodeBodyNode):  # If there is only one statement, put it into a codebody
+            codeBody = CodeBodyNode()
+            codeBody.add(self.children[0])
+            self.children[0] = codeBody
+            codeBody.parent = self
+
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         self.children[0].toLLVM(file, funcDef, codeBody)
 
 
 class IfStatementNode(ASTNode):
+    def startDFS(self):
+        if not isinstance(self.children[1], CodeBodyNode): # If there is only one statement, put it into a codebody
+            codeBody = CodeBodyNode()
+            codeBody.add(self.children[1])
+            self.children[1] = codeBody
+            codeBody.parent = self
+
+    def endDFS(self):
+        if isinstance(self.children[0], ValueNode):  # Constante in if-statement, dus we kunnen vereenvoudigen
+            value = self.children[0].value
+            index = self.parent.children.index(self)
+            if value:  # If statement is always true
+                self.parent.children[index] = self.children[1]
+                self.parent.children[index].parent = self.parent
+            else:  # If statement is always false
+                if len(self.children) == 3:  # Else statement
+                    self.parent.children[index] = self.children[2].children[0]
+                    self.parent.children[index].parent = self.parent
+                else:  # Geen else statement
+                    self.parent.children.pop(index)
+
+
+
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         ELSE = len(self.children) == 3
         resultLLVMVar = self.children[0].toLLVM(file, funcDef, codeBody)
@@ -1220,7 +1250,7 @@ class SumNode(OperationNode):
             if isinstance(child, ValueNode):
                 temp.append(child)
 
-        if len(temp) == 0: # niets kan gefold worden
+        if len(temp) == 0:  # niets kan gefold worden
             return
 
         result = self.mergeOperands(temp)
@@ -1269,6 +1299,9 @@ class ProductNode(OperationNode):
         for child in self.children:
             if isinstance(child, ValueNode):
                 temp.append(child)
+
+        if len(temp) == 0: # niets kan gefold worden
+            return
 
         result = self.mergeOperands(temp)
         result.parent = self
