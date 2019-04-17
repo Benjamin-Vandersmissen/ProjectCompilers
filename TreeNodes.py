@@ -901,6 +901,9 @@ class ArrayElementNode(ASTNode):  # TODO: llvm
 
 
 class AssignmentNode(ASTNode):
+    def type(self):
+        return self.children[0].type()
+
     def endDFS(self):
         # Give warnings or errors for type conversion / invalid types for operations
 
