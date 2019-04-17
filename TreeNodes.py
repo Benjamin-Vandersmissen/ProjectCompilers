@@ -1310,10 +1310,30 @@ class ProductNode(OperationNode):
 
 
 class ComparisonNode(OperationNode):
-    pass
+    def isCompatibleType(self, type1, type2):
+        if type1[-1] == '*' and type2[-1] == '*' and type1 != type2:
+            self.printWarning('Comparison of distinct pointer types : {} , {}'.format(type1, type2))
+
+        if (type1[-1] == '*' and type2[-1] != '*') or (type2[-1] == '*' and type1[-1] != '*'):
+            self.printWarning('Comparison between pointer and integer : {} , {}'.format(type1, type2))
+
+        return True
+
+    def mergeType(self, type1, type2):
+        return 'int'
+
+    def type(self):
+        type = None
+        for child in self.children:
+            if type is None:
+                type = child.type()
+            else:
+                if self.isCompatibleType(type, child.type()):
+                    type = self.mergeType(type, child.type())
+        return type
 
 
-class ConstantComparisonNode(OperationNode):
+class ConstantComparisonNode(ComparisonNode):
     pass
 
 
