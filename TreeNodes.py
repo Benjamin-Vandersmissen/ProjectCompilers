@@ -376,12 +376,9 @@ class ReturnStatementNode(ASTNode):
             file.write("ret void\n")
         else:
             llvmReturnType = llvm.checkTypeAndAlign(funcDef.children[0].children[0].typename)[0]
-            #####################################################################################################
-            ######## DO NOT OPTIMIZE THE FOLLOWING CODE => Else the order of the writing won't be good!! ########
-            #####################################################################################################
             file.write("ret " + str(llvmReturnType) + " " + str(
                 self.children[0].toLLVM(file, funcDef, codeBody, llvmReturnType)) + "\n")
-        # Return in llvm uses a register, so add 1 to the counter
+        # The return operation in llvm uses a register, so add 1 to the counter
         funcDef.getLocalNumber(llvm.checkTypeAndAlign('return'))
 
 
