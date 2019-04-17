@@ -277,20 +277,8 @@ class CodeBodyNode(ASTNode):
         # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
 
-    # int a = 1 + 'A' + 2.01;
-    # int main() {
-    #     a = b;
-    #     char a;
-    #     a = b;
-    #     {
-    #         float a;
-    #         a = b;
-    #     }
-    #     a = 1;
-    # }
-
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        if codeBody != None:  # TODO: llvm: TEST (staat hierboven) als Benjamin ervoor gezorgt heeft dat een codeBody kind van een codeBody een codeBody blijft en niet gemerged wordt
+        if codeBody != None:
             self.counterTable = copy.deepcopy(codeBody.counterTable)
         func = isinstance(self.parent, FunctionDefinitionNode)
         # If a function body, add the arguments of the function
@@ -492,7 +480,7 @@ class IfStatementNode(ASTNode):
 
 
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nog testen met nieuwe aanpassingen
         ELSE = len(self.children) == 3
         resultLLVMVar = self.children[0].toLLVM(file, funcDef, codeBody)
         # If the llvm var isn't the result from comparison, we have to see if it's zero or not
@@ -505,10 +493,6 @@ class IfStatementNode(ASTNode):
         labelCounter += 1
         label1 = 'something' + str(labelCounter)
 
-        # The order of the localNumbers has to be good, so pre-write the codeBody of the if statement
-        tempFile1 = llvm.FileLookALike()
-        self.children[1].toLLVM(tempFile1, funcDef, codeBody)  # TODO: llvm: weghalen tempfile en op juiste plaats zetten
-
         # typeAndAlign2 = llvm.checkTypeAndAlign('label')
         # label2 = funcDef.getLocalNumber(typeAndAlign2)
         labelCounter += 1
@@ -518,8 +502,6 @@ class IfStatementNode(ASTNode):
         label3 = 'ERROR'
         tempFile2 = 'ERROR'
         if ELSE:
-            # typeAndAlign3 = llvm.checkTypeAndAlign('label')
-            # label3 = funcDef.getLocalNumber(typeAndAlign2)
             labelCounter += 1
             label3 = 'something' + str(labelCounter)
 
@@ -529,7 +511,7 @@ class IfStatementNode(ASTNode):
         # file.write('; <label>:' + str(label1) + ':\n')
         file.write(label1 + ':\n')
         # codeBody of the if statement
-        file.write(tempFile1.text)
+        self.children[1].toLLVM(file, funcDef, codeBody)
         if ELSE:
             # br label %10
             file.write('br label %' + str(label3) + '\n\n')
@@ -622,7 +604,7 @@ class DeclarationNode(ASTNode):
                 typeAndAlign[0]) + "* %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
 
 
-class ArrayDeclarationNode(ASTNode):  # TODO: llvm
+class ArrayDeclarationNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
 
@@ -681,6 +663,9 @@ class ArrayDeclarationNode(ASTNode):  # TODO: llvm
                 for child in self.children[3].children:
                     self.compatibleInitializerTypes(typename, child.type())
 
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm (constant) array declaration
+        pass
+
 
 class ConstantDeclarationNode(DeclarationNode):
     def startDFS(self):
@@ -709,7 +694,7 @@ class ConstantDeclarationNode(DeclarationNode):
                     '@' + str(identifier) + ' = common global ' + str(typeAndAlign[0]) + ' ' + str(standardValue) + ', align ' +
                     typeAndAlign[1] + '\n')
 
-            else:
+            else:  # TODO: llvm: ondersteunen van constant operaties! (waarschijnlijk bepaalde dingen door toLLVm vervangen)
                 identifier = self.children[1].children[0].identifier
                 file.write('@' + str(identifier) + ' = global ' + str(typeAndAlign[0]) + ' ')
                 if llvm.isPointer(typeAndAlign[0]):
@@ -745,7 +730,7 @@ class ConstantDeclarationNode(DeclarationNode):
             codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
 
 
-class ConstantArrayDeclarationNode(ArrayDeclarationNode):  # TODO: llvm
+class ConstantArrayDeclarationNode(ArrayDeclarationNode):
     pass
 
 
