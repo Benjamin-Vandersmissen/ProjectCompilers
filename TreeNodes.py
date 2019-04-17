@@ -220,7 +220,6 @@ class ProgramNode(ASTNode):
 
         global symbolTables
         symbolTables.append(SymbolTableNode())
-        # TODO: add standaard shit in symboltable
 
     def endDFS(self):
         global symbolTables, functionTable
@@ -336,6 +335,42 @@ class StatementNode(ASTNode):
 
 
 class ReturnStatementNode(ASTNode):
+
+    def compatibleTypes(self, lhsType, rhsType):
+        if lhsType in ['char', 'int'] and rhsType in ['int', 'float'] and lhsType != rhsType:
+            self.printWarning("possible loss of information by returning type {} from a function returning type {}".
+                              format(rhsType, lhsType))
+
+        if (lhsType == 'float' or rhsType == 'float') and (lhsType.count('*') > 0 or rhsType.count('*') > 0
+                                                           or rhsType.count('[') > 0):
+            self.throwError('Returning {} from a function with incompatible result type {}"'.format(rhsType, lhsType))
+
+        if lhsType.count('*') != rhsType.count('*') + rhsType.count('['):
+            if lhsType.count('*') == 0:
+                self.printWarning(
+                    "Incompatible pointer to integer conversion returning {} from a function with return type {}".format(
+                        rhsType, lhsType))
+            elif lhsType.count('*') == 0:
+                self.printWarning(
+                    "Incompatible integer to pointer conversion returning {} from a function with return type {}".format(
+                        lhsType, rhsType))
+            else:
+                self.printWarning(
+                    "Incompatible pointer types returning {} from a function with return type {}".format(rhsType, lhsType))
+        elif lhsType.count('*') > 0 and lhsType.split('*')[0] != rhsType.split('*')[0]:
+            self.printWarning(
+                "Incompatible pointer types returning {} from a function with return type {}".format(rhsType, lhsType))
+
+    def startDFS(self):
+        # check for compatible return types
+        definition = self.parent
+        while not isinstance(definition, FunctionDefinitionNode):
+            definition = definition.parent
+
+        returnType = definition.children[0].children[0].typename
+        type = self.children[0].type()
+        self.compatibleTypes(returnType, type)
+
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         if len(self.children) == 0:
             file.write("ret void\n")
