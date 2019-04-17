@@ -1,4 +1,5 @@
 import struct
+import TreeNodes
 
 # Class that looks like file object
 class FileLookALike():
@@ -8,9 +9,16 @@ class FileLookALike():
     def write(self, text):
         self.text += text
 
+
 # Change the format from a float to a hexadecimal number
 def float_to_hex(f):
     return hex(struct.unpack('<I', struct.pack('<f', f))[0])
+
+
+# Change the format of a hexadecimal number to a float
+def hex_to_float(h):
+    return  struct.unpack('!f', bytes.fromhex(h[-16:-8]))[0]
+
 
 # Check if type is pointer, if so returns the amount of pointers
 def isPointer(typename):
@@ -21,6 +29,7 @@ def isPointer(typename):
                 amount += 1
         return amount
     return 0
+
 
 # Cast the C type to the correct format for llvm and gives the align number
 def checkTypeAndAlign(typename):
@@ -47,6 +56,9 @@ def checkTypeAndAlign(typename):
     elif typename == 'return':
         typename = 'return'
         align = 'OK'
+    elif typename == 'i64':
+        typename = 'i64'
+        align = 8
     else:
         raise Exception('Unknown type "' + str(typename) + '"found in function checkTypeAndAlign!')
     # If a pointer add the stars to the type
@@ -59,8 +71,10 @@ def checkTypeAndAlign(typename):
 
 
 # Cast the C value to the correct format for llvm
-def valueTransformer(typename, value):  # TODO: llvm: als float al in hex staat en hierin komt, wordt het dan niet een char? werkt dit, zo niet aanpassen dat hex eerst float wordt!
-    if typename == 'int' or typename == 'i32':
+def valueTransformer(typename, value):
+    if value[-8:len(value)] == '00000000':
+        value = hex_to_float(value)
+    if typename == 'int' or typename == 'i32' or typename == 'i64':
         if isinstance(value, int):
             return value
         elif isinstance(value, str):
@@ -91,7 +105,7 @@ def valueTransformer(typename, value):  # TODO: llvm: als float al in hex staat 
 # Create the right llvm code to change a type of the value of an llvm variable and returns the llvm variable name
 # expects targetType to be an llvmType
 # expects varName in form of %1 or @a  (llvm)
-def changeLLVMType(targetType, varName, funcDef, file):  # TODO: llvm: add i64 for every type + finish if var is pointer
+def changeLLVMType(targetType, varName, funcDef, file, dereference=False):
     if isinstance(varName, str):
         if varName[0] == '%':
             typeAndAlign = funcDef.typeAndAlignTable[varName[1:len(varName)]]
@@ -104,6 +118,7 @@ def changeLLVMType(targetType, varName, funcDef, file):  # TODO: llvm: add i64 f
     # Change to type of the value to the target type
     if targetType != typeAndAlign[0]:
         varType = typeAndAlign[0]
+        operation = 'ERROR'
         originalTargetType = 'ERROR'
         if isPointer(varType[0]):  # If the variable is already a pointer
             if isPointer(targetType):  # If target type is a pointer
@@ -113,16 +128,26 @@ def changeLLVMType(targetType, varName, funcDef, file):  # TODO: llvm: add i64 f
             else:
                 raise Exception('Unknown target type "' + str(varType) + '" in the function changeLLVMType!')
         elif varType == 'i1':
-            originalTargetType = targetType
-            targetType = 'i32'
-            operation = 'zext'
+            if targetType == 'i32':
+                operation = 'zext'
+            else:
+                varName = changeLLVMType('i32', varName, funcDef, file)
+                return changeLLVMType(targetType, varName, funcDef, file)
+            # elif
+            # originalTargetType = targetType
+            # targetType = 'i32'
+            # operation = 'zext'
         elif varName == 'i64':
             if isPointer(targetType):
                 operation = 'inttoptr'
         elif varType == 'i32':
             if isPointer(targetType):  # If target type is a pointer
-                operation = 'bitcast'
-                varType = 'i32*'
+                if dereference:
+                    operation = 'bitcast'
+                    varType = 'i32*'
+                else:
+                    varName = changeLLVMType('i64', varName, funcDef, file)
+                    return changeLLVMType(targetType, varName, funcDef, file)
             elif targetType == 'i8':
                 operation = 'trunc'
             elif targetType == 'float':
@@ -133,8 +158,9 @@ def changeLLVMType(targetType, varName, funcDef, file):  # TODO: llvm: add i64 f
                 raise Exception('Unknown target type "' + str(varType) + '" in the function changeLLVMType!')
         elif varType == 'i8':
             if isPointer(targetType):
-                operation = 'bitcast'
-                varType = 'i8*'
+                if dereference:
+                    operation = 'bitcast'
+                    varType = 'i8*'
             elif targetType == 'i32':
                 operation = 'sext'
             elif targetType == 'float':
@@ -143,8 +169,9 @@ def changeLLVMType(targetType, varName, funcDef, file):  # TODO: llvm: add i64 f
                 raise Exception('Unknown target type "' + str(varType) + '" in the function changeLLVMType!')
         elif varType == 'float':
             if isPointer(targetType):
-                operation = 'bitcast'
-                varType = 'float*'
+                if dereference:
+                    operation = 'bitcast'
+                    varType = 'float*'
             elif targetType == 'i32':
                 operation = 'fptosi'
             elif targetType == 'i8':
@@ -158,10 +185,10 @@ def changeLLVMType(targetType, varName, funcDef, file):  # TODO: llvm: add i64 f
         # %4 = trunc i32 %3 to i8
         file.write('%' + str(localNumber) + ' = ' + str(operation) + ' ' + str(varType) + ' ' + str(varName) + ' to ' + str(
             targetType) + '\n')
-        if varType == 'i1':
-            return changeLLVMType(originalTargetType, '%' + str(localNumber), funcDef, file)
-        else:
-            return '%' + str(localNumber)
+        # if varType == 'i1':
+        #     return changeLLVMType(originalTargetType, '%' + str(localNumber), funcDef, file)
+        # else:
+        return '%' + str(localNumber)
     else:
         return varName
         
@@ -196,15 +223,30 @@ def getLLVMOfCVarible(varName, funcDef, codeBody):
     return varName, typeAndAlign
 
 
-# Get the llvm type of a C variable
-# expects varName to be an C varable name, better known as the identifier member
-def getLLVMTypeOfCVariable(varName, funcDef, codeBody):
-    if varName in codeBody.counterTable:  # If the wanted variable is a local variable
-        localNumber = codeBody.counterTable[varName]
-        typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
-    else:  # If the wanted variable is a global variable
-        typeAndAlign = funcDef.parent.typeAndAlignTable[varName]
-    return typeAndAlign[0]
+# Get the llvm type of a variable
+# Expects noC to be a bool, true if the variables can't be C variables, so they will be values
+def getLLVMTypeOfVariable(varName, funcDef, codeBody): #, noC=False):
+    if isinstance(varName, str):
+        if varName[0] == '%':
+            typeAndAlign = funcDef.typeAndAlignTable[varName[1:len(varName)]]
+        elif varName[0] == '@':
+            typeAndAlign = funcDef.parent.typeAndAlignTable[varName[1:len(varName)]]
+        else:
+            #if not noC:
+            temp = getLLVMOfCVarible(varName, funcDef, codeBody)
+            varName = temp[0]
+            typeAndAlign = temp[1]
+            # else:
+            #     if varName[-8:len(varName)] == '00000000':
+            #         typeAndAlign = checkTypeAndAlign('float')
+                # else:
+                #     typeAndAlign = checkTypeAndAlign('char')
+    else:
+        # if isinstance(varName, int):
+        #     typeAndAlign = checkTypeAndAlign('int')
+        # else:
+        raise Exception('Unknown variable "' + str(varName) + '" found!')
+    return  typeAndAlign
 
 
 # Store the value of an llvm variable in a llvm variable representing a C variable
@@ -226,47 +268,183 @@ def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):
     file.write('store ' + str(typeAndAlign[0]) + ' ' + str(valueVar) + ', ' + str(typeAndAlign[0]) + '* ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
 
 
-# Get the llvm type of an llvm variable
-# expects varName to be an llvm varable name, better known as %1 or @a
-def getLLVMTypeOfLLVMVariable(varName, funcDef):
-    if varName[0] == '%':
-        temp = varName[1:len(varName)]
-        typeAndAlign = funcDef.typeAndAlignTable[temp]
-    elif varName[0] == '@':
-        typeAndAlign = funcDef.parent.typeAndAlignTable[varName[1:len(varName)]]
-    else:
-        raise Exception('The given variable name "' + str(varName) + '" isn\'t an llvm variable name!')
-    return typeAndAlign[0]
-
-
 # Write the llvm code to do a full operation
 # expects operands to be a list of llvm variables, better know as %1 or @a
 # expects compasrion to be true if it the operation is a comparsion operation
-def writeLLVMOperation(llvmOperator, llvmReturnType, operands, funcDef, file, comparison=False):
+def writeLLVMOperation(operator, operands, funcDef, codeBody, file):
     cur = operands[0]
+    type1 = ''
+    if isinstance(cur, TreeNodes.ValueNode):
+        type1 = checkTypeAndAlign(cur.type())[0]
+        cur = cur.toLLVM(file, funcDef, codeBody)
+    else:
+        cur = cur.toLLVM(file, funcDef, codeBody)
+        type1 = getLLVMTypeOfVariable(cur, funcDef, codeBody)
     for i in range(1, len(operands)):
-        if isinstance(cur, str) and cur[0] != '0' and cur[-8:len(cur)] != '00000000':
-            temp = changeLLVMType(llvmReturnType, cur, funcDef, file)
-        else:
-            temp = valueTransformer(llvmReturnType, cur)
+        temp = cur
         cur = operands[i]
-        if comparison:
-            typeAndAlign = checkTypeAndAlign('i1')
+        if isinstance(cur, TreeNodes.ValueNode):
+            type2 = checkTypeAndAlign(cur.type())[0]
+            cur = cur.toLLVM(file, funcDef, codeBody)
         else:
-            typeAndAlign = checkTypeAndAlign(llvmReturnType)
+            cur = cur.toLLVM(file, funcDef, codeBody)
+            type2 = getLLVMTypeOfVariable(cur, funcDef, codeBody)
+        operationInfo = getLLVMOperatorAndReturnType(operator, type1, type2)
+        temp = changeLLVMType(operationInfo[1], temp, funcDef, file)
+        cur = changeLLVMType(operationInfo[2], cur, funcDef, file)
+        # localNumber = 'ERROR'
+        typeAndAlign = checkTypeAndAlign(operationInfo[3])
         localNumber = funcDef.getLocalNumber(typeAndAlign)
-        file.write('%' + str(localNumber) + ' = ' + str(llvmOperator) + ' ' + str(llvmReturnType) + ' ' + str(
-            temp) + ', ' + str(cur) + "\n")
+        if operationInfo[5]:  # If switched
+            var1 = cur
+            var2 = temp
+        else:
+            var1 = temp
+            var2 = cur
+        if operationInfo[4] == 1:
+            # %8 = icmp eq i8* %2, %7
+            file.write('%' + str(localNumber) + ' = ' + str(operationInfo[0]) + ' ' + str(typeAndAlign[0]) + ' ' + str(
+                var1) + ', ' + str(var2) + "\n")
+            type1 = operationInfo[3]
+        elif operationInfo[4] == 2:
+            # %9 = getelementptr inbounds i32*, i32** %4, i64 %8
+            file.write('%' + str(localNumber) + ' = ' + str(operationInfo[0]) + ' ' + str(operationInfo[1][0:-1]) + ', ' + str(operationInfo[1]) + ' ' + str(var1) + ', ' + str(operationInfo[2]) + ' ' + str(var2) + '\n')
+        elif operationInfo[4] == 3:
+            pass
         cur = '%' + str(localNumber)
     return cur
 
+
+def getLLVMOperatorAndReturnType(operator, type1, type2):
+    operationType = 'ERROR'
+    returnType = 'ERROR'
+    switched = False
+
+    if isPointer(type1) or isPointer(type2):
+        switched = False
+        if not isPointer(type1):
+            temp = type1
+            type1 = type2
+            type2 = temp
+            switched = True
+        if isPointer(type2):
+            returnType = type1
+            operationType = 1
+            if operator == '-':
+                type1 = 'i64'
+                type2 = 'i64'
+                operator = 'sub'  # nsw
+                returnType = 'i64'
+            elif operator == '==':
+                operator = 'icmp eq'
+            elif operator == '<':
+                operator = 'icmp ult'
+            elif operator == '>':
+                operator = 'icmp sgt'
+            else:
+                raise Exception('Operator not supported with pointer variables!')
+        elif type2 == 'i64' or type2 == 'i32' or type2 == 'i8':
+            if operator == '+':
+                type2 = 'i64'
+                operator = 'getelementptr inbounds'
+                operationType = 2
+                returnType = type1
+            # TODO: llvm: overige operatoren
+            elif operator == '-':
+                operator = 'sub'  # nsw
+            elif operator == '*':
+                operator = 'mul'  # nsw
+            elif operator == '/':
+                operator = 'sdiv'
+            elif operator == '==':
+                operator = 'icmp eq'
+            elif operator == '<':
+                operator = 'icmp slt'
+            elif operator == '>':
+                operator = 'icmp sgt'
+            else:
+                raise Exception('Unknown operator found!')
+        else:
+            raise Exception('No operation with a pointer and ' + str(type2) + ' exists!')
+    elif type1 == 'i32':
+        if isPointer(type2):
+            pass
+        else:
+            type2 = 'i32'
+            returnType = 'i32'
+    elif type1 == 'i8':
+        if isPointer(type2):
+            pass
+        else:
+            type1 = 'i32'
+            type2 = 'i32'
+            returnType = 'i32'
+    elif type1 == 'float':
+        if isPointer(type2):
+            pass
+        else:
+            type2 = 'float'
+            returnType = 'float'
+    elif type1 == 'i1':
+        if isPointer(type2):
+            pass
+        elif type2 == 'i1':
+            type1 = 'i32'
+            type2 = 'i32'
+            returnType = 'i32'
+        else:
+            type1 = type2
+            returnType = type2
+    else:
+        raise Exception('Unknown type found!')
+
+    if returnType == 'i32':
+        if operator == '+':
+            operator = 'add'  #nsw
+        elif operator == '-':
+            operator = 'sub'  #nsw
+        elif operator == '*':
+            operator = 'mul'  #nsw
+        elif operator == '/':
+            operator = 'sdiv'
+        elif operator == '==':
+            operator = 'icmp eq'
+        elif operator == '<':
+            operator = 'icmp slt'
+        elif operator == '>':
+            operator = 'icmp sgt'
+        else:
+            raise Exception('Unknown operator found!')
+        operationType = 1
+
+    elif returnType == 'float':
+        if operator == '+':
+            operator = 'fadd'
+        elif operator == '-':
+            operator = 'fsub'
+        elif operator == '*':
+            operator = 'fmul'
+        elif operator == '/':
+            operator = 'fdiv'
+        elif operator == '==':
+            operator = 'fcmp oeq'
+        elif operator == '<':
+            operator = 'fcmp olt'
+        elif operator == '>':
+            operator = 'fcmp ogt'
+        else:
+            raise Exception('Unknown operator found!')
+        operationType = 1
+
+    return operator, type1, type2, returnType, operationType, switched
+
 # Returns the register which has as value a bool which is the result of the comparison between the statement and 0
-def writeLLVMCompareWithZero(resultLLVMVar, funcDef, file):  # TODO: llvm: compatible met constants (misschien al verkleinen in AST?)
+def writeLLVMCompareWithZero(resultLLVMVar, funcDef, codeBody, file):  # TODO: llvm: compatible met constants (misschien al verkleinen in AST?)
     # if isinstance(self.children[0], ValueNode): # or child.__class__.__name__[0:8] == 'Constant':
     #     llvmTokens.append(llvm.valueTransformer(llvmReturnType, child.value))
     # else:
     #     llvmTokens.append(llvm.changeLLVMType(llvmReturnType, child.toLLVM(file, funcDef, codeBody), funcDef, file))
-    typeResult = getLLVMTypeOfLLVMVariable(resultLLVMVar, funcDef)
+    typeResult = getLLVMTypeOfVariable(resultLLVMVar, funcDef, codeBody)
     operator = 'ERROR'
     if typeResult == 'i32':
         operator = 'icmp ne'

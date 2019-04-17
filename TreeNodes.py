@@ -374,9 +374,9 @@ class DereferenceNode(ASTNode):  # TODO: llvm test
         varName = temp[0]
         typeAndAlign = temp[1]
         if returnType is None:
-            return llvm.changeLLVMType(str(typeAndAlign[0]) + '*', varName, funcDef, file)
+            return llvm.changeLLVMType(str(typeAndAlign[0]) + '*', varName, funcDef, file, True)
         else:
-            return llvm.changeLLVMType(returnType, varName, funcDef, file)
+            return llvm.changeLLVMType(returnType, varName, funcDef, file, True)
 
 
 
@@ -435,7 +435,7 @@ class IfStatementNode(ASTNode):
         resultLLVMVar = self.children[0].toLLVM(file, funcDef, codeBody)
         # If the llvm var isn't the result from comparison, we have to see if it's zero or not
         if not isinstance(self.children[0], ComparisonNode):
-            resultLLVMVar = llvm.writeLLVMCompareWithZero(resultLLVMVar, funcDef, file)
+            resultLLVMVar = llvm.writeLLVMCompareWithZero(resultLLVMVar, funcDef, codeBody, file)
 
         # typeAndAlign1 = llvm.checkTypeAndAlign('label')
         # label1 = funcDef.getLocalNumber(typeAndAlign1)
@@ -502,7 +502,7 @@ class WhileStatementNode(ASTNode):
         resultLLVMVar = self.children[0].toLLVM(file, funcDef, codeBody)
         # If the llvm var isn't the result from comparison, we have to see if it's zero or not
         if not isinstance(self.children[0], ComparisonNode):
-            resultLLVMVar = llvm.writeLLVMCompareWithZero(resultLLVMVar, funcDef, file)
+            resultLLVMVar = llvm.writeLLVMCompareWithZero(resultLLVMVar, funcDef, codeBody, file)
 
         labelCounter += 1
         label2 = 'something' + str(labelCounter)
@@ -800,7 +800,7 @@ class FunctionDefinitionNode(ASTNode):
             if identifier in reservedWords:
                 arguments.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
             symbolTables[-1].addSymbol(typename, identifier)
-        
+
         # TODO: check return type values
         
     def endDFS(self):
@@ -1164,38 +1164,16 @@ class OperationNode(ASTNode):
     def endDFS(self):
         self.foldExpression()
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: operations with pointers -> i64!!  TESTEN
-        llvmTokens = list()
-        llvmReturnType = ''
-        it = 0
-        # If one of the children is a dereference, always use the i64 type
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nieuwe manier van operations (with pointers) TESTEN
+        operands = list()
         for child in self.children:
-            if isinstance(child, DereferenceNode):
-                llvmReturnType = 'i64'
-                it = 1
-                break
-        if it == 1:
-            pass
-        # If the expression is part of an assignment or declaration, return the type of that variable
-        elif isinstance(self.parent, AssignmentNode):
-            it = 1
-            llvmReturnType = llvm.getLLVMTypeOfCVariable(self.parent.children[0].identifier, funcDef, codeBody)
-        elif isinstance(self.parent, DeclarationNode):
-            it = 1
-            llvmReturnType = llvm.getLLVMTypeOfCVariable(self.parent.children[1].identifier, funcDef, codeBody)
-        for child in self.children:
-            # If none of the statements before were true, take the type of the first operand
-            if it == 0:
-                if isinstance(self.children[0], ValueNode):
-                    llvmTokens.append(child.value)
-                    llvmReturnType = child.type()
-                else:
-                    llvmTokens.append(child.toLLVM(file, funcDef, codeBody))
-                    llvmReturnType = llvm.getLLVMTypeOfLLVMVariable(llvmTokens[0], funcDef)
-                it = 1
-                continue
-            llvmTokens.append(child.toLLVM(file, funcDef, codeBody, llvmReturnType))
-        return llvmReturnType, llvmTokens
+            operands.append(child.toLLVM(file, funcDef, codeBody))
+        if returnType is None:
+            return llvm.writeLLVMOperation(self.operator, self.children, funcDef, codeBody, file)
+        else:
+            return llvm.changeLLVMType(returnType,
+                                       llvm.writeLLVMOperation(self.operator, operands, funcDef, codeBody, file),
+                                       funcDef, file)
 
 
 class SumNode(OperationNode):
@@ -1257,30 +1235,6 @@ class SumNode(OperationNode):
         for child in self.children:
             if isinstance(child, ValueNode) and child in temp:
                 self.children.remove(child)
-
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        temp = super(SumNode, self).toLLVM(file, funcDef, codeBody)
-        llvmReturnType = temp[0]
-        operands = temp[1]
-
-        llvmOperator = 'ERROR'
-        if llvmReturnType == 'i32' or llvmReturnType == 'i8':
-            if self.operator == '+':
-                llvmOperator = 'add nsw'
-            elif self.operator == '-':
-                llvmOperator = 'sub nsw'
-        elif llvmReturnType == 'float':
-            if self.operator == '+':
-                llvmOperator = 'fadd'
-            elif self.operator == '-':
-                llvmOperator = 'fsub'
-        else:
-            raise Exception('Unknown operator found!')
-
-        if returnType is None:
-            return llvm.writeLLVMOperation(llvmOperator, llvmReturnType, operands, funcDef, file)
-        else:
-            return llvm.writeLLVMOperation(returnType, llvmReturnType, operands, funcDef, file)
 
 
 class ProductNode(OperationNode):
@@ -1356,33 +1310,7 @@ class ProductNode(OperationNode):
 
 
 class ComparisonNode(OperationNode):
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        temp = super(ComparisonNode, self).toLLVM(file, funcDef, codeBody)
-        llvmReturnType = temp[0]
-        operands = temp[1]
-
-        llvmOperator = 'ERROR'
-        if llvmReturnType == 'i32' or llvmReturnType == 'i8':
-            if self.operator == '==':
-                llvmOperator = 'icmp eq'
-            elif self.operator == '<':
-                llvmOperator = 'icmp slt'
-            elif self.operator == '>':
-                llvmOperator = 'icmp sgt'
-        elif llvmReturnType == 'float':
-            if self.operator == '==':
-                llvmOperator = 'fcmp oeq'
-            elif self.operator == '<':
-                llvmOperator = 'fcmp olt'
-            elif self.operator == '>':
-                llvmOperator = 'fcmp ogt'
-        else:
-            raise Exception('Unknown operator found!')
-
-        if returnType is None:
-            return llvm.writeLLVMOperation(llvmOperator, llvmReturnType, operands, funcDef, file, True)
-        else:
-            return llvm.writeLLVMOperation(returnType, llvmReturnType, operands, funcDef, file, True)
+    pass
 
 
 class ConstantComparisonNode(OperationNode):
