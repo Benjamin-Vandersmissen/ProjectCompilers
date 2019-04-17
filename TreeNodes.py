@@ -385,7 +385,7 @@ class ReturnStatementNode(ASTNode):
         funcDef.getLocalNumber(llvm.checkTypeAndAlign('return'))
 
 
-class DereferenceNode(ASTNode):  # TODO: llvm test
+class DereferenceNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
         self.dereference = ''
@@ -415,7 +415,7 @@ class DereferenceNode(ASTNode):  # TODO: llvm test
 
 
 
-class DepointerNode(ASTNode):  # TODO: llvm test
+class DepointerNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
         self.depointer = ''
@@ -448,10 +448,10 @@ class DepointerNode(ASTNode):  # TODO: llvm test
                 depointerAmount += 1
             if self.depointer[i] != '*':
                 break
-        var = llvm.getValueOfVariable(self.depointer[depointerAmount:len(self.depointer)], funcDef, codeBody, file)
-        for _ in range(depointerAmount):
-            var = llvm.getValueOfVariable(var, funcDef, codeBody, file)
-
+        var = llvm.getValueOfVariable(self.depointer[depointerAmount:len(self.depointer)], funcDef, codeBody, file, True)
+        for _ in range(depointerAmount - 1):
+            var = llvm.getValueOfVariable(var, funcDef, codeBody, file, True)
+        var = llvm.getValueOfVariable(var, funcDef, codeBody, file)
         if returnType is None:
             return var
         else:
@@ -741,10 +741,9 @@ class ConstantDeclarationNode(DeclarationNode):
             else:
                 identifier = self.children[1].children[0].identifier
                 # store i32 3, i32* %1, align 4
-                if isinstance(self.children[1].children[1], DereferenceNode):  # TODO: llvm: pointers
+                if isinstance(self.children[1].children[1], DereferenceNode):
                     print("")
-                file.write('store ' + str(typeAndAlign[0]) + ' ' + str(
-                    llvm.valueTransformer(self.children[0].typename, self.children[1].children[1].value)) + ', ' + str(
+                file.write('store ' + str(typeAndAlign[0]) + ' ' + str(self.children[1].children[1].toLLVM(file, funcDef, codeBody, self.children[0].typename)) + ', ' + str(
                     typeAndAlign[0]) + '* %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
             codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
 
@@ -1248,14 +1247,14 @@ class OperationNode(ASTNode):
         self.foldExpression()
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nieuwe manier van operations (with pointers) TESTEN
-        operands = list()
-        for child in self.children:
-            operands.append(child.toLLVM(file, funcDef, codeBody))
+        # operands = list()
+        # for child in self.children:
+        #     operands.append(child.toLLVM(file, funcDef, codeBody))
         if returnType is None:
             return llvm.writeLLVMOperation(self.operator, self.children, funcDef, codeBody, file)
         else:
             return llvm.changeLLVMType(returnType,
-                                       llvm.writeLLVMOperation(self.operator, operands, funcDef, codeBody, file),
+                                       llvm.writeLLVMOperation(self.operator, self.children, funcDef, codeBody, file),
                                        funcDef, file)
 
 
@@ -1368,31 +1367,6 @@ class ProductNode(OperationNode):
         for child in self.children:
             if isinstance(child, ValueNode) and child in temp:
                 self.children.remove(child)
-
-
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        temp = super(ProductNode, self).toLLVM(file, funcDef, codeBody)
-        llvmReturnType = temp[0]
-        operands = temp[1]
-
-        llvmOperator = 'ERROR'
-        if llvmReturnType == 'i32' or llvmReturnType == 'i8':
-            if self.operator == '*':
-                llvmOperator = 'mul nsw'
-            elif self.operator == '/':
-                llvmOperator = 'sdiv'
-        elif llvmReturnType == 'float':
-            if self.operator == '*':
-                llvmOperator = 'fmul'
-            elif self.operator == '/':
-                llvmOperator = 'fdiv'
-        else:
-            raise Exception('Unknown operator found!')
-
-        if returnType is None:
-            return llvm.writeLLVMOperation(llvmOperator, llvmReturnType, operands, funcDef, file)
-        else:
-            return llvm.writeLLVMOperation(returnType, llvmReturnType, operands, funcDef, file)
 
 
 class ComparisonNode(OperationNode):
