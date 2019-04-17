@@ -361,7 +361,7 @@ class ReturnStatementNode(ASTNode):
             self.printWarning(
                 "Incompatible pointer types returning {} from a function with return type {}".format(rhsType, lhsType))
 
-    def startDFS(self):
+    def endDFS(self):
         # check for compatible return types
         definition = self.parent
         while not isinstance(definition, FunctionDefinitionNode):
@@ -661,14 +661,10 @@ class ArrayDeclarationNode(ASTNode):  # TODO: llvm
         size = ' '
         if len(self.children) == 4:
             size = self.children[2].value
-            for child in self.children[3].children:
-                self.compatibleInitializerTypes(typename, child.type())
 
         if len(self.children) == 3:
             if isinstance(self.children[2], ArrayListNode):
                 size = len(self.children[2].children)
-                for child in self.children[3].children:
-                    self.compatibleInitializerTypes(typename, child.type())
             else:
                 size = self.children[2].value
         typename = typename + '[' + str(size) + ']'
@@ -676,6 +672,17 @@ class ArrayDeclarationNode(ASTNode):  # TODO: llvm
         if identifier in reservedWords:
             self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
+
+    def endDFS(self):
+        typename = self.children[0].typename
+        if len(self.children) == 4:
+            for child in self.children[3].children:
+                self.compatibleInitializerTypes(typename, child.type())
+
+        if len(self.children) == 3:
+            if isinstance(self.children[2], ArrayListNode):
+                for child in self.children[3].children:
+                    self.compatibleInitializerTypes(typename, child.type())
 
 
 class ConstantDeclarationNode(DeclarationNode):
@@ -895,7 +902,9 @@ class ArrayElementNode(ASTNode):  # TODO: llvm
 
 
 class AssignmentNode(ASTNode):
-    def startDFS(self):
+    def endDFS(self):
+        # Give warnings or errors for type conversion / invalid types for operations
+
         lhsType = self.children[0].type()
         rhsType = self.children[1].type()
 
@@ -1052,7 +1061,6 @@ class FunctionCallNode(ASTNode):
             self.throwError("Function {} is not defined".format(identifier))
 
         argumentCount = len(self.children[1].children)
-        f = functionTable
         arguments = functionTable.functionTable[identifier][1]
 
         if argumentCount > len(arguments):
@@ -1062,15 +1070,25 @@ class FunctionCallNode(ASTNode):
             # infinite arguments possible
             if argumentCount < len(arguments) - 1:
                 self.throwError("Expected at least {} arguments, got()".format(len(arguments) - 1, argumentCount))
+        else:
+            if argumentCount < len(arguments):
+                self.throwError("Expected {} arguments, got {}".format(len(arguments), argumentCount))
 
+
+    def endDFS(self):
+        # Type check each argument
+
+        identifier = self.children[0].identifier
+        arguments = functionTable.functionTable[identifier][1]
+        if arguments[-1] == '...':
+            # infinite arguments possible
             for i in range(len(arguments) - 1):  # Don't check the optional arguments
                 self.compatibleArgumentTypes(arguments[i], self.children[1].children[i].type())
 
         else:
-            if argumentCount < len(arguments):
-                self.throwError("Expected {} arguments, got {}".format(len(arguments), argumentCount))
             for i in range(len(arguments)):
                 self.compatibleArgumentTypes(arguments[i], self.children[1].children[i].type())
+
 
     def type(self):
         if functionTable.exists(self.children[0].identifier):
