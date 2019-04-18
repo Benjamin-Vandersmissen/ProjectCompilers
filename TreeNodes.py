@@ -292,7 +292,6 @@ class CodeBodyNode(ASTNode):
 
         self.symbolTable = symbolTables.pop()
 
-
         if self.hasReturn:
             parent = self.parent
             while not isinstance(parent, CodeBodyNode) and not isinstance(parent, FunctionDefinitionNode):
@@ -309,7 +308,7 @@ class CodeBodyNode(ASTNode):
         return False
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        if codeBody != None:  # TODO: llvm: TEST (staat hierboven) als Benjamin ervoor gezorgt heeft dat een codeBody kind van een codeBody een codeBody blijft en niet gemerged wordt
+        if codeBody != None:
             self.counterTable = copy.deepcopy(codeBody.counterTable)
         func = isinstance(self.parent, FunctionDefinitionNode)
         # If a function body, add the arguments of the function
@@ -404,12 +403,9 @@ class ReturnStatementNode(ASTNode):
             file.write("ret void\n")
         else:
             llvmReturnType = llvm.checkTypeAndAlign(funcDef.children[0].children[0].typename)[0]
-            #####################################################################################################
-            ######## DO NOT OPTIMIZE THE FOLLOWING CODE => Else the order of the writing won't be good!! ########
-            #####################################################################################################
             file.write("ret " + str(llvmReturnType) + " " + str(
                 self.children[0].toLLVM(file, funcDef, codeBody, llvmReturnType)) + "\n")
-        # Return in llvm uses a register, so add 1 to the counter
+        # The return operation in llvm uses a register, so add 1 to the counter
         funcDef.getLocalNumber(llvm.checkTypeAndAlign('return'))
 
 
@@ -523,7 +519,7 @@ class IfStatementNode(ASTNode):
 
 
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nog testen met nieuwe aanpassingen
         ELSE = len(self.children) == 3
         resultLLVMVar = self.children[0].toLLVM(file, funcDef, codeBody)
         # If the llvm var isn't the result from comparison, we have to see if it's zero or not
@@ -536,10 +532,6 @@ class IfStatementNode(ASTNode):
         labelCounter += 1
         label1 = 'something' + str(labelCounter)
 
-        # The order of the localNumbers has to be good, so pre-write the codeBody of the if statement
-        tempFile1 = llvm.FileLookALike()
-        self.children[1].toLLVM(tempFile1, funcDef, codeBody)  # TODO: llvm: weghalen tempfile en op juiste plaats zetten
-
         # typeAndAlign2 = llvm.checkTypeAndAlign('label')
         # label2 = funcDef.getLocalNumber(typeAndAlign2)
         labelCounter += 1
@@ -549,8 +541,6 @@ class IfStatementNode(ASTNode):
         label3 = 'ERROR'
         tempFile2 = 'ERROR'
         if ELSE:
-            # typeAndAlign3 = llvm.checkTypeAndAlign('label')
-            # label3 = funcDef.getLocalNumber(typeAndAlign2)
             labelCounter += 1
             label3 = 'something' + str(labelCounter)
 
@@ -560,7 +550,7 @@ class IfStatementNode(ASTNode):
         # file.write('; <label>:' + str(label1) + ':\n')
         file.write(label1 + ':\n')
         # codeBody of the if statement
-        file.write(tempFile1.text)
+        self.children[1].toLLVM(file, funcDef, codeBody)
         if ELSE:
             # br label %10
             file.write('br label %' + str(label3) + '\n\n')
@@ -661,7 +651,7 @@ class DeclarationNode(ASTNode):
                 typeAndAlign[0]) + "* %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
 
 
-class ArrayDeclarationNode(ASTNode):  # TODO: llvm
+class ArrayDeclarationNode(ASTNode):
     def __init__(self):
         ASTNode.__init__(self)
 
@@ -717,8 +707,31 @@ class ArrayDeclarationNode(ASTNode):  # TODO: llvm
 
         if len(self.children) == 3:
             if isinstance(self.children[2], ArrayListNode):
-                for child in self.children[3].children:
+                for child in self.children[2].children:
                     self.compatibleInitializerTypes(typename, child.type())
+
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm (constant) array declaration
+        arrayList = None
+        typename = '['
+        if isinstance(self.children[2], ConstantArrayListNode):
+            arrayList = self.children[2].children
+            typename += str(len(self.children[2].children))
+        else:
+            typename += str(len(self.children[2].value))
+            if len(self.children) == 4:
+                arrayList = self.children[3].children
+        typename += ' x ' + str(self.children[0].typename) + ']'
+
+        typeAndAlign = llvm.checkTypeAndAlign(typename)
+        localNumber = funcDef.getLocalNumber(typeAndAlign)
+        # %1 = alloca [13 x i32], align 16
+        file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0]) + ', align ' + str(typeAndAlign[1]) + '\n')
+
+        if arrayList is not None:
+            for element in arrayList:
+                varName = element.toLLVM(file, funcDef, codeBody)
+                # TODO: llvm: Hoe verder maken? (internet)
+
 
 
 class ConstantDeclarationNode(DeclarationNode):
@@ -748,7 +761,8 @@ class ConstantDeclarationNode(DeclarationNode):
                     '@' + str(identifier) + ' = common global ' + str(typeAndAlign[0]) + ' ' + str(standardValue) + ', align ' +
                     typeAndAlign[1] + '\n')
 
-            else:
+            else:  # TODO: llvm: ondersteunen van constant operaties! (waarschijnlijk bepaalde dingen door toLLVm vervangen)
+                #  !!! Moet waarschijnlijk eerst eens zien hoe het moet via website, ik denk alles op 1 lijn (wat wreet ambetant is met hoe het nu gebeurt)
                 identifier = self.children[1].children[0].identifier
                 file.write('@' + str(identifier) + ' = global ' + str(typeAndAlign[0]) + ' ')
                 if llvm.isPointer(typeAndAlign[0]):
@@ -784,8 +798,25 @@ class ConstantDeclarationNode(DeclarationNode):
             codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
 
 
-class ConstantArrayDeclarationNode(ArrayDeclarationNode):  # TODO: llvm
-    pass
+class ConstantArrayDeclarationNode(ArrayDeclarationNode):
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nog eens online checken voor globale var
+        if isinstance(self.parent, CodeBodyNode):
+            return super().toLLVM(file, funcDef, codeBody, returnType)
+        elif isinstance(self.parent, ProgramNode):
+            arrayList = None
+            typename = '['
+            if isinstance(self.children[2], ConstantArrayListNode):
+                 arrayList = self.children[2].children
+                 typename += str(len(self.children[2].children))
+            else:
+                 typename += str(len(self.children[2].value))
+            typename += ' x ' + str(self.children[0].typename) + ']'
+
+            pass
+            # @Z = global [2 x i32*]
+            file.write('@' + str(self.children[1].identifier) + ' = ')
+
+
 
 
 class ConstantValueNode(ASTNode):
@@ -929,11 +960,25 @@ class ReturnTypeNode(TypeNameNode):
     pass
 
 
-class ArrayElementNode(ASTNode):  # TODO: llvm
+class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
     def type(self):
         identifier = self.children[0].identifier
         type = symbolTables[-1].getEntry(identifier)
         return type.split('[')[0]  # simplistic approach, only works for one dimensional arrays
+
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+        temp = llvm.getLLVMOfCVarible(self.children[0].identifier, funcDef, codeBody)
+        varName = temp[0]
+        typeAndAlign = temp [1]
+        llvmReturnType = llvm.getArrayTypeInfo(typeAndAlign[0])[1]
+        localNumber = funcDef.getLocalNumber(llvm.checkTypeAndAlign(llvmReturnType))
+        # %2 = getelementptr inbounds [13 x i32], [13 x i32]* %1, i64 0, i64 1
+        file.write('%' + str(localNumber) + ' = getelementptr inbounds ' + str(typeAndAlign[0]) + ', ' + str(typeAndAlign[0]) + '* ' + str(varName) + ', i64 0, i64' + str(self.children[1].value))
+
+        if returnType is None:
+            return '%' + str(localNumber)
+        else:
+            return llvm.changeLLVMType(returnType, '%' + str(localNumber), funcDef, file)
 
 
 class AssignmentNode(ASTNode):

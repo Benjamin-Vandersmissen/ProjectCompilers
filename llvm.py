@@ -31,12 +31,26 @@ def isPointer(typename):
     return 0
 
 
+# Get all information about an array type or False when it isn't an array
+def getArrayTypeInfo(arrayType):
+    # Check if array
+    if arrayType[0] == '[' and arrayType[-1] == ']':
+        for i in range(len(arrayType)):
+            if arrayType[i] == ' ':
+                return int(arrayType[1:i]), arrayType[i+3:-1]
+    return False
+
+
 # Cast the C type to the correct format for llvm and gives the align number
 def checkTypeAndAlign(typename):
-    # Check if pointer if so take type and save amount of stars
+    # If pointer, take type and save amount of stars
     pointerAmount = isPointer(typename)
     if pointerAmount != 0:
         typename = typename[0:(-pointerAmount)]
+    # If array, get all info and change typename
+    arrayTypeInfo = getArrayTypeInfo(typename)
+    if arrayTypeInfo:
+        typename = arrayTypeInfo[1]
     # Check the type
     if typename == 'int' or typename == 'i32':
         typename = 'i32'
@@ -58,10 +72,14 @@ def checkTypeAndAlign(typename):
         align = 'OK'
     elif typename == 'i64':
         typename = 'i64'
-        align = 8
+        align = '8'
     else:
         raise Exception('Unknown type "' + str(typename) + '" found in function checkTypeAndAlign!')
-    # If a pointer add the stars to the type
+    # If array, create the right type
+    if arrayTypeInfo:
+        typename = '[' + str(arrayTypeInfo[0]) + ' x ' + str(typename) + ']'
+        align = '16'  # TODO: llvm: ik dacht eerst dat het van het type afhing maar ik denk combinatie met type en lengte
+    # If pointer, add the stars to the type
     if pointerAmount != 0:
         for _ in range(pointerAmount):
             typename += '*'
@@ -119,11 +137,6 @@ def changeLLVMType(targetType, varName, funcDef, file, dereference=False):
             raise Exception('Unknown type of llvm variable: ' + str(varName))
     else:  # No variable means a value
         return valueTransformer(targetType, varName)
-    # Change to type of the value to the target type
-    # if dereference:
-    #     tempType = typeAndAlign[0] + '*'
-    # else:
-    #     tempType = typeAndAlign[0]
     if targetType != typeAndAlign[0]:
         varType = typeAndAlign[0]
         operation = 'ERROR'
@@ -141,10 +154,6 @@ def changeLLVMType(targetType, varName, funcDef, file, dereference=False):
             else:
                 varName = changeLLVMType('i32', varName, funcDef, file)
                 return changeLLVMType(targetType, varName, funcDef, file)
-            # elif
-            # originalTargetType = targetType
-            # targetType = 'i32'
-            # operation = 'zext'
         elif varType == 'i64':
             if isPointer(targetType):
                 operation = 'inttoptr'
@@ -202,9 +211,6 @@ def changeLLVMType(targetType, varName, funcDef, file, dereference=False):
         # %4 = trunc i32 %3 to i8
         file.write('%' + str(localNumber) + ' = ' + str(operation) + ' ' + str(varType) + ' ' + str(varName) + ' to ' + str(
             targetType) + '\n')
-        # if varType == 'i1':
-        #     return changeLLVMType(originalTargetType, '%' + str(localNumber), funcDef, file)
-        # else:
         return '%' + str(localNumber)
     else:
         return varName
@@ -245,26 +251,17 @@ def getLLVMOfCVarible(varName, funcDef, codeBody):
 
 # Get the llvm type of a variable
 # Expects noC to be a bool, true if the variables can't be C variables, so they will be values
-def getLLVMTypeOfVariable(varName, funcDef, codeBody): #, noC=False):
+def getLLVMTypeOfVariable(varName, funcDef, codeBody):
     if isinstance(varName, str):
         if varName[0] == '%':
             typeAndAlign = funcDef.typeAndAlignTable[varName[1:len(varName)]]
         elif varName[0] == '@':
             typeAndAlign = funcDef.parent.typeAndAlignTable[varName[1:len(varName)]]
         else:
-            #if not noC:
             temp = getLLVMOfCVarible(varName, funcDef, codeBody)
             varName = temp[0]
             typeAndAlign = temp[1]
-            # else:
-            #     if varName[-8:len(varName)] == '00000000':
-            #         typeAndAlign = checkTypeAndAlign('float')
-                # else:
-                #     typeAndAlign = checkTypeAndAlign('char')
     else:
-        # if isinstance(varName, int):
-        #     typeAndAlign = checkTypeAndAlign('int')
-        # else:
         raise Exception('Unknown variable "' + str(varName) + '" found!')
     return typeAndAlign[0]
 
@@ -383,7 +380,6 @@ def getLLVMOperatorAndReturnType(operator, type1, type2):
                 operator = 'getelementptr inbounds'
                 operationType = 2
                 returnType = type1
-            # TODO: llvm: overige operatoren
             elif operator == '-':
                 type2 = 'i64'
                 operator = 'getelementptr inbounds'
@@ -400,28 +396,17 @@ def getLLVMOperatorAndReturnType(operator, type1, type2):
         else:
             raise Exception('No operation with a pointer and ' + str(type2) + ' exists!')
     elif type1 == 'i32':
-        if isPointer(type2):
-            pass
-        else:
-            type2 = 'i32'
-            returnType = 'i32'
+        type2 = 'i32'
+        returnType = 'i32'
     elif type1 == 'i8':
-        if isPointer(type2):
-            pass
-        else:
-            type1 = 'i32'
-            type2 = 'i32'
-            returnType = 'i32'
+        type1 = 'i32'
+        type2 = 'i32'
+        returnType = 'i32'
     elif type1 == 'float':
-        if isPointer(type2):
-            pass
-        else:
-            type2 = 'float'
-            returnType = 'float'
+        type2 = 'float'
+        returnType = 'float'
     elif type1 == 'i1':
-        if isPointer(type2):
-            pass
-        elif type2 == 'i1':
+        if type2 == 'i1':
             type1 = 'i32'
             type2 = 'i32'
             returnType = 'i32'
