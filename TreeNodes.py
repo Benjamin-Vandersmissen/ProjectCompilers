@@ -257,6 +257,10 @@ class CodeBodyNode(ASTNode):
         super().__init__()
         self.counterTable = dict()
 
+        self.hasReturn = False
+        self.isVoidFunction = False
+        self.pathsWithNoReturn = 0
+
     def startDFS(self):
         # build a new symbol table
         global symbolTables
@@ -269,25 +273,40 @@ class CodeBodyNode(ASTNode):
             if isinstance(child, OperationNode):
                 child.printWarning("Unused expression: {}".format(child.text()))
                 self.children.remove(child)
+            if isinstance(child, ReturnStatementNode):
+                self.hasReturn = True
+            if isinstance(child, IfStatementNode) or isinstance(child, WhileStatementNode):
+                self.pathsWithNoReturn += 2
 
-    def canMerge(self, node):
-        return False
+        if not self.hasReturn:
+            parent = self.parent
+            while not isinstance(parent, CodeBodyNode) and not isinstance(parent, FunctionDefinitionNode):
+                parent = parent.parent
+            if isinstance(parent, CodeBodyNode):
+                if parent.hasReturn:
+                    self.hasReturn = True
+                self.isVoidFunction = parent.isVoidFunction
 
     def endDFS(self):
         # symbol table is finished, pop from stack
+
         self.symbolTable = symbolTables.pop()
 
-    # int a = 1 + 'A' + 2.01;
-    # int main() {
-    #     a = b;
-    #     char a;
-    #     a = b;
-    #     {
-    #         float a;
-    #         a = b;
-    #     }
-    #     a = 1;
-    # }
+
+        if self.hasReturn:
+            parent = self.parent
+            while not isinstance(parent, CodeBodyNode) and not isinstance(parent, FunctionDefinitionNode):
+                parent = parent.parent
+            if isinstance(parent, CodeBodyNode):
+                if not parent.hasReturn:
+                    parent.pathsWithNoReturn -= 1
+                    if parent.pathsWithNoReturn == 0:
+                        parent.hasReturn = True
+        if not self.hasReturn and not self.isVoidFunction:
+            self.throwError("Control reaches end of non-void function")
+
+    def canMerge(self, node):
+        return False
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         if codeBody != None:  # TODO: llvm: TEST (staat hierboven) als Benjamin ervoor gezorgt heeft dat een codeBody kind van een codeBody een codeBody blijft en niet gemerged wordt
@@ -337,6 +356,12 @@ class StatementNode(ASTNode):
 class ReturnStatementNode(ASTNode):
 
     def compatibleTypes(self, lhsType, rhsType):
+        if lhsType == 'void' and rhsType != 'void':
+            self.throwError("void function should not return a value")
+
+        if lhsType != 'void' and rhsType == 'void':
+            self.throwError("Non-void function should return a value")
+
         if lhsType in ['char', 'int'] and rhsType in ['int', 'float'] and lhsType != rhsType:
             self.printWarning("possible loss of information by returning type {} from a function returning type {}".
                               format(rhsType, lhsType))
@@ -368,7 +393,10 @@ class ReturnStatementNode(ASTNode):
             definition = definition.parent
 
         returnType = definition.children[0].children[0].typename
-        type = self.children[0].type()
+        if len(self.children) == 0:
+            type = 'void'
+        else:
+            type = self.children[0].type()
         self.compatibleTypes(returnType, type)
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
@@ -585,6 +613,14 @@ class WhileStatementNode(ASTNode):
 
         # something3:  (stop while)
         file.write(label3 + ':\n')
+
+    def endDFS(self):
+        if isinstance(self.children[0], ValueNode):
+            if self.children[0].value:  # always true
+                self.printWarning("Endless loop")
+            else:
+                self.printWarning("Condition is always False")
+
 
 
 class TypeNameNode(ASTNode):
@@ -851,6 +887,9 @@ class FunctionDefinitionNode(ASTNode):
         symbolTables[-1].add(newSymbolTable)
         symbolTables.append(newSymbolTable)
 
+        if self.children[0].children[0].typename == 'void':
+            self.children[1].isVoidFunction = True
+
         if len(self.children[0].children) < 3:  # geen argumenten, dus skip
             return
         arguments = self.children[0].children[2]
@@ -872,14 +911,11 @@ class FunctionDefinitionNode(ASTNode):
                 arguments.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
             symbolTables[-1].addSymbol(typename, identifier)
 
-        # TODO: check return type values
-        
     def endDFS(self):
         # symbol table is finished, pop from stack
         identifier = self.children[0].children[1].identifier
         entry = functionTable.functionTable[identifier]
         functionTable.functionTable[identifier] = (entry[0], entry[1], True)
-        test = symbolTables
         self.symbolTable = symbolTables.pop()
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
@@ -1440,4 +1476,4 @@ class IdentifierNode(ASTNode):
         if returnType is None:
             return llvm.getValueOfVariable(self.identifier, funcDef, codeBody, file)
         else:
-            return llvm.valueTransformer(returnType, llvm.getValueOfVariable(self.identifier, funcDef, codeBody, file))
+            return
