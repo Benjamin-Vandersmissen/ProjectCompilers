@@ -290,7 +290,9 @@ class CodeBodyNode(ASTNode):
         # Find out if a codeBody always has a return. It has a return if a return exists in the codeBody, if each
         # path in the codeBody has a return or if a parent code block has a return
         # Remove unreachable code
-        for child in self.children:
+        index = 0
+        while index < len(self.children):
+            child = self.children[index]
             if isinstance(child, OperationNode):
                 child.printWarning("Unused expression: {}".format(child.text()))
                 self.children.remove(child)
@@ -302,6 +304,8 @@ class CodeBodyNode(ASTNode):
                 self.children = self.children[:index+1]
             if isinstance(child, IfStatementNode) or isinstance(child, WhileStatementNode):
                 self.pathsWithNoReturn += 2
+            if child in self.children:  # child is not removed => update index
+                index += 1
 
         if not self.hasReturn:
             parent = self.parent
