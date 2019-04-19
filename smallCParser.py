@@ -890,10 +890,10 @@ class smallCParser ( Parser ):
             else:
                 return self.getTypedRuleContext(smallCParser.ConstantExpressionContext,i)
 
-        def PLUS(self):
-            return self.getToken(smallCParser.PLUS, 0)
         def MINUS(self):
             return self.getToken(smallCParser.MINUS, 0)
+        def PLUS(self):
+            return self.getToken(smallCParser.PLUS, 0)
 
         def enterRule(self, listener:ParseTreeListener):
             if hasattr( listener, "enterConstantSum" ):

@@ -9,6 +9,69 @@ class FileLookALike():
     def write(self, text):
         self.text += text
 
+    # Return the content of the tempFile in one line of llvm code
+    # Expects endVar to be a llvm variable that is returned by the executed toLLVM function
+    def putOnOneLine(self, endVar):
+        # Create helper function
+        def replaceVar(var):
+            beginIndex = False
+            endIndex = False
+            temp = self.text.split()
+            words = list()
+
+            # Take commas as separate words
+            for word in temp:
+                if word[-1] == ',':
+                    words.append(word[0:-1])
+                    words.append(word[-1])
+                else:
+                    words.append(word)
+
+            # Search the begin and end of the llvm command for the searched var
+            for i in range(len(words)):
+                if words[i] == var and words[i+1] == '=':
+                    beginIndex = i + 2
+                    for j in range(i + 2, len(words), 1):
+                        if words[j][0] == '%' and words[j + 1] == '=':
+                            endIndex = j - 1
+                            break
+                        elif j == len(words) - 1:
+                            endIndex = j
+                            break
+                    if not endIndex:
+                        raise Exception('TempFile wasn\'t created correctly! EndIndex wasn\'t found!')
+                    break
+            if not beginIndex:
+                raise Exception('TempFile wasn\'t created correctly! BeginIndex wasn\'t found!')
+
+            # Edit the llvm command so it can be put on one line
+            command = ''
+            operatorPassed = False
+            for i in range(beginIndex, endIndex + 1, 1):
+                if not operatorPassed and checkTypeAndAlign(words[i]):  # If first type is found the llvm operator is finished so add (
+                    command += '('
+                    operatorPassed = True
+                if words[i][0] == '%':  # If word is a var, replace it with its command
+                    command += replaceVar(words[i])
+                else:
+                    command += str(words[i])
+                if i == endIndex:  # If last word has passed the llvm command is finished so add )
+                    command += ')'
+                    continue
+                if words[i+1] != ',':
+                    command += ' '
+            return command
+
+        # Activate the recursive helper function
+        if len(self.text) > 0:
+            return replaceVar(endVar)
+        else:
+            return endVar
+
+
+
+
+
 
 # Change the format from a float to a hexadecimal number
 def float_to_hex(f):
@@ -41,7 +104,7 @@ def getArrayTypeInfo(arrayType):
     return False
 
 
-# Cast the C type to the correct format for llvm and gives the align number
+# Cast the C type to the correct format for llvm and gives the align number, if not known returns false
 def checkTypeAndAlign(typename):
     # If pointer, take type and save amount of stars
     pointerAmount = isPointer(typename)
@@ -74,7 +137,7 @@ def checkTypeAndAlign(typename):
         typename = 'i64'
         align = '8'
     else:
-        raise Exception('Unknown type "' + str(typename) + '" found in function checkTypeAndAlign!')
+        return False
     # If array, create the right type
     if arrayTypeInfo:
         typename = '[' + str(arrayTypeInfo[0]) + ' x ' + str(typename) + ']'
@@ -137,6 +200,8 @@ def changeLLVMType(targetType, varName, funcDef, file, dereference=False):
             raise Exception('Unknown type of llvm variable: ' + str(varName))
     else:  # No variable means a value
         return valueTransformer(targetType, varName)
+    # if varName == '@a1':
+    #     print('')
     if targetType != typeAndAlign[0]:
         varType = typeAndAlign[0]
         operation = 'ERROR'
@@ -286,6 +351,7 @@ def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):
 # expects operands to be a list of llvm variables, better know as %1 or @a
 # expects compasrion to be true if it the operation is a comparsion operation
 def writeLLVMOperation(operator, operands, funcDef, codeBody, file):
+    llvmOperation = ''
     cur = operands[0]
     type1 = ''
     if isinstance(cur, TreeNodes.ValueNode):
@@ -304,15 +370,15 @@ def writeLLVMOperation(operator, operands, funcDef, codeBody, file):
             cur = cur.toLLVM(file, funcDef, codeBody)
             type2 = getLLVMTypeOfVariable(cur, funcDef, codeBody)
         operationInfo = getLLVMOperatorAndReturnType(operator, type1, type2)
-        temp = changeLLVMType(operationInfo[1], temp, funcDef, file)
-        cur = changeLLVMType(operationInfo[2], cur, funcDef, file)
-        localNumber = 'ERROR'
         if operationInfo[5]:  # If switched
             var1 = cur
             var2 = temp
         else:
             var1 = temp
             var2 = cur
+        var1 = changeLLVMType(operationInfo[1], var1, funcDef, file)
+        var2 = changeLLVMType(operationInfo[2], var2, funcDef, file)
+        localNumber = 'ERROR'
         if operationInfo[4] == 1:
             typeAndAlign = checkTypeAndAlign(operationInfo[3])
             localNumber = funcDef.getLocalNumber(typeAndAlign)
@@ -327,10 +393,13 @@ def writeLLVMOperation(operator, operands, funcDef, codeBody, file):
             file.write('%' + str(localNumber) + ' = ' + str(operationInfo[0]) + ' ' + str(operationInfo[1][0:-1]) + ', ' + str(operationInfo[1]) + ' ' + str(var1) + ', ' + str(operationInfo[2]) + ' ' + str(var2) + '\n')
             type1 = operationInfo[3]
         elif operationInfo[4] == 3:
-            localNumber = funcDef.getLocalNumber(checkTypeAndAlign('i64'))
-            # %6 = sub i64 0, %5
-            file.write('%' + str(localNumber) + ' = sub i64 0, ' + str(var2) + '\n')
-            var2 = '%' + str(localNumber)
+            if not isinstance(var2, str): # and (var2[0] != '@' or var2[0] != '%'):
+                var2 *= -1
+            else:
+                localNumber = funcDef.getLocalNumber(checkTypeAndAlign('i64'))
+                # %6 = sub i64 0, %5
+                file.write('%' + str(localNumber) + ' = sub i64 0, ' + str(var2) + '\n')
+                var2 = '%' + str(localNumber)
 
             typeAndAlign = checkTypeAndAlign(operationInfo[3])
             localNumber = funcDef.getLocalNumber(typeAndAlign)
@@ -395,64 +464,68 @@ def getLLVMOperatorAndReturnType(operator, type1, type2):
                 raise Exception('Unknown operator found!')
         else:
             raise Exception('No operation with a pointer and ' + str(type2) + ' exists!')
-    elif type1 == 'i32':
-        type2 = 'i32'
-        returnType = 'i32'
-    elif type1 == 'i8':
-        type1 = 'i32'
-        type2 = 'i32'
-        returnType = 'i32'
-    elif type1 == 'float':
-        type2 = 'float'
-        returnType = 'float'
-    elif type1 == 'i1':
-        if type2 == 'i1':
+    else:
+        if type1 == 'i32':
+            type2 = 'i32'
+            returnType = 'i32'
+        elif type1 == 'i8':
             type1 = 'i32'
             type2 = 'i32'
             returnType = 'i32'
+        elif type1 == 'float':
+            type2 = 'float'
+            returnType = 'float'
+        elif type1 == 'i1':
+            if type2 == 'i1':
+                type1 = 'i32'
+                type2 = 'i32'
+                returnType = 'i32'
+            else:
+                type1 = type2
+                returnType = type2
+        elif type1 == 'i64':
+            type2 = type1
+            returnType = type1
         else:
-            type1 = type2
-            returnType = type2
-    else:
-        raise Exception('Unknown type "' + str(type1) + '" found!')
+            raise Exception('Unknown type "' + str(type1) + '" found!')
 
-    if returnType == 'i32':
-        if operator == '+':
-            operator = 'add'  #nsw
-        elif operator == '-':
-            operator = 'sub'  #nsw
-        elif operator == '*':
-            operator = 'mul'  #nsw
-        elif operator == '/':
-            operator = 'sdiv'
-        elif operator == '==':
-            operator = 'icmp eq'
-        elif operator == '<':
-            operator = 'icmp slt'
-        elif operator == '>':
-            operator = 'icmp sgt'
-        else:
-            raise Exception('Unknown operator found!')
-        operationType = 1
+        if returnType == 'i32' or returnType == 'i64':
+            if operator == '+':
+                operator = 'add'  #nsw
+            elif operator == '-':
+                operator = 'sub'  #nsw
+            elif operator == '*':
+                operator = 'mul'  #nsw
+            elif operator == '/':
+                operator = 'sdiv'
+            elif operator == '==':
+                operator = 'icmp eq'
+            elif operator == '<':
+                operator = 'icmp slt'
+            elif operator == '>':
+                operator = 'icmp sgt'
+            else:
+                raise Exception('Unknown operator found!')
+            operationType = 1
 
-    elif returnType == 'float':
-        if operator == '+':
-            operator = 'fadd'
-        elif operator == '-':
-            operator = 'fsub'
-        elif operator == '*':
-            operator = 'fmul'
-        elif operator == '/':
-            operator = 'fdiv'
-        elif operator == '==':
-            operator = 'fcmp oeq'
-        elif operator == '<':
-            operator = 'fcmp olt'
-        elif operator == '>':
-            operator = 'fcmp ogt'
-        else:
-            raise Exception('Unknown operator found!')
-        operationType = 1
+        elif returnType == 'float':
+            if operator == '+':
+                operator = 'fadd'
+            elif operator == '-':
+                operator = 'fsub'
+            elif operator == '*':
+                operator = 'fmul'
+            elif operator == '/':
+                operator = 'fdiv'
+            elif operator == '==':
+                operator = 'fcmp oeq'
+            elif operator == '<':
+                operator = 'fcmp olt'
+            elif operator == '>':
+                operator = 'fcmp ogt'
+            else:
+                raise Exception('Unknown operator found!')
+            operationType = 1
 
     return operator, type1, type2, returnType, operationType, switched
 
