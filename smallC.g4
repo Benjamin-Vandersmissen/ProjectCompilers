@@ -29,7 +29,7 @@ returnStatement
 
 constantExpression
         : constantExpression (STAR|FORWARD_SLASH) constantExpression #constantProduct
-        | constantExpression (PLUS|MINUS) constantExpression #constantSum
+        | constantExpression (MINUS|PLUS) constantExpression #constantSum
         | constantExpression (LARGER_THAN|SMALLER_THAN|EQUALS) constantExpression #constantComparison
         | constant #constantValue
         ;

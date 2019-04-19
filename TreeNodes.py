@@ -815,24 +815,22 @@ class ConstantDeclarationNode(DeclarationNode):
 
             else:  # TODO: llvm: ondersteunen van constant operaties! (waarschijnlijk bepaalde dingen door toLLVm vervangen)
                 #  !!! Moet waarschijnlijk eerst eens zien hoe het moet via website, ik denk alles op 1 lijn (wat wreet ambetant is met hoe het nu gebeurt)
+                # Een temp file, funcDef en codeBody aanmaken, die meegeven aan de write llvm operation, dan deze uitslag da in tempfile is opgeslagen overlopen en de var vervangen zodat lles op 1 lijn komt
                 identifier = self.children[1].children[0].identifier
-                file.write('@' + str(identifier) + ' = global ' + str(typeAndAlign[0]) + ' ')
-                if llvm.isPointer(typeAndAlign[0]):
-                    toBeReferenced = self.children[1].children[1].dereference
-                    toBeReferenced = toBeReferenced[1:len(toBeReferenced)]
-                    typeAndAlignRef = self.parent.typeAndAlignTable[toBeReferenced]
-                    if typeAndAlignRef[0] + '*' == typeAndAlign[0]:
-                        # @a1 = global i32* @a, align 8
-                        file.write('@' + str(toBeReferenced))
-                    else:
-                        # @f1 = global i8* bitcast (float* @h to i8*), align 8
-                        file.write('bitcast (' + str(typeAndAlignRef[0]) + '* @' + str(toBeReferenced) + ' to ' + str(typeAndAlign[0]) + ')')
-                else:
-                    # @a = global i32 5, align 4
-                    file.write(str(llvm.valueTransformer(self.children[0].typename, self.children[1].children[1].value)))
-                file.write(', align ' + typeAndAlign[1] + '\n')
+                # Create temporary variables
+                tempFuncDef = FunctionDefinitionNode()
+                tempFuncDef.parent = self.parent
+                tempCodeBody = CodeBodyNode()
+                tempFile = llvm.FileLookALike()
+                # Execute the toLLVM function of the value constantAssignment
+                endVar = self.children[1].children[1].toLLVM(tempFile, tempFuncDef, tempCodeBody, typeAndAlign[0])
+                # Put the outputted llvm commands by the toLLVM function on one line
+                endStr = tempFile.putOnOneLine(endVar)
+                # @a = global i32 5, align 4 or @d11 = local_unnamed_addr global i8* bitcast (i32* getelementptr (i32, i32* @b, i64 32) to i8*), align 8
+                file.write('@' + str(identifier) + ' = global ' + str(typeAndAlign[0]) + ' ' + str(endStr) + ', align ' + typeAndAlign[1] + '\n')
 
             self.parent.typeAndAlignTable[identifier] = typeAndAlign
+
         elif isinstance(self.parent, CodeBodyNode):
             # %1 = alloca i32, align 4
             localNumber = funcDef.getLocalNumber(typeAndAlign)
@@ -843,8 +841,6 @@ class ConstantDeclarationNode(DeclarationNode):
             else:
                 identifier = self.children[1].children[0].identifier
                 # store i32 3, i32* %1, align 4
-                if isinstance(self.children[1].children[1], DereferenceNode):
-                    print("")
                 file.write('store ' + str(typeAndAlign[0]) + ' ' + str(self.children[1].children[1].toLLVM(file, funcDef, codeBody, self.children[0].typename)) + ', ' + str(
                     typeAndAlign[0]) + '* %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
             codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
