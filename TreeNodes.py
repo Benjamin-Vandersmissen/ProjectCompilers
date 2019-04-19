@@ -423,6 +423,13 @@ class DereferenceNode(ASTNode):
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.dereference + '"];\n'
 
+    def startDFS(self):
+        identifier = self.dereference.split('&')[-1]
+        if not symbolTables[-1].exists(identifier) and not functionTable.exists(identifier):
+            print(symbolTables[-1].symbolTable)
+            raise Exception(
+                "Identifier " + identifier + " not found at " + str(self.line) + ":" + str(self.column))
+
     def type(self):
         identifier = self.dereference[1:]
         type = symbolTables[-1].getEntry(identifier)
@@ -464,6 +471,13 @@ class DepointerNode(ASTNode):
         type = symbolTables[-1].getEntry(identifier)
         type = type.split('*')[0] + (type.count('*') - self.depointer.count('*')) * '*'
         return type
+
+    def startDFS(self):
+        identifier = self.depointer.split('*')[-1]
+        if not symbolTables[-1].exists(identifier) and not functionTable.exists(identifier):
+            print(symbolTables[-1].symbolTable)
+            raise Exception(
+                "Identifier " + identifier + " not found at " + str(self.line) + ":" + str(self.column))
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         depointerAmount = 0
