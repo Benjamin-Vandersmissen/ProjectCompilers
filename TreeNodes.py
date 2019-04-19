@@ -146,9 +146,12 @@ class ASTNode(TreeNode):
 
     def buildSymbolTable(self):
         self.startDFS()
-        test = symbolTables
-        for child in self.children:
+        index = 0
+        while index < len(self.children):
+            child = self.children[index]
             child.buildSymbolTable()
+            if child in self.children:  # child is not removed => update index
+                index += 1
 
         self.endDFS()
 
@@ -296,7 +299,7 @@ class CodeBodyNode(ASTNode):
                 index = self.children.index(child)
                 if index < len(self.children) - 1:
                     self.children[-1].printWarning("Unreachable Code")
-                self.children = self.children[:index]
+                self.children = self.children[:index+1]
             if isinstance(child, IfStatementNode) or isinstance(child, WhileStatementNode):
                 self.pathsWithNoReturn += 2
 
