@@ -14,10 +14,12 @@ class TreeNode:
         self.parent = None
         self.children = []
 
+    # Add a childnode
     def add(self, treenode):
         self.children.append(treenode)
         self.children[-1].parent = self
 
+    # Add a childnode in front of the nodes
     def addFront(self, treenode):
         self.children.insert(0, treenode)
         self.children[0].parent = self
@@ -28,9 +30,11 @@ class SymbolTableNode(TreeNode):
         TreeNode.__init__(self)
         self.symbolTable = dict()
 
+    # Add a symbol (typename and identifier) in the symboltable
     def addSymbol(self, typename, identifier):
         self.symbolTable[identifier] = typename
 
+    # Check if a symbol exists in this or this ancestors scopes
     def exists(self, identifier):
         found = identifier in self.symbolTable
 
@@ -50,6 +54,8 @@ class SymbolTableNode(TreeNode):
         representation += '</table>>];\n'
         return representation
 
+    # Get the entry for a specific identifier (returns the type)
+    # Returns None if the entry is not found in this or this ancestors scope
     def getEntry(self, identifier):
         found = identifier in self.symbolTable
 
@@ -66,9 +72,11 @@ class FunctionTableNode(TreeNode):
         TreeNode.__init__(self)
         self.functionTable = dict()
 
+    # Add a function (returnType, identifier, list of argument types) to the function table
     def addFunction(self, returnType, identifier, arguments, defined=False):
         self.functionTable[identifier] = (returnType, arguments, defined)
 
+    # Check if an identifier exists in the function table
     def exists(self, identifier):
         found = identifier in self.functionTable
 
@@ -77,6 +85,7 @@ class FunctionTableNode(TreeNode):
 
         return found
 
+    # Check if a signature (returnType, identifier, list of argumentTypes) exists in the function table
     def signatureExists(self, returnType, identifier, arguments):
         if identifier in self.functionTable:
             value = self.functionTable[identifier]
@@ -103,6 +112,7 @@ class FunctionTableNode(TreeNode):
         representation += '</table>>];\n'
         return representation
 
+    # Check if a function with given identifier is defined
     def isDefined(self, identifier):
         if identifier in self.functionTable:
             return self.functionTable[identifier][2]
@@ -136,15 +146,20 @@ class ASTNode(TreeNode):
 
     def buildSymbolTable(self):
         self.startDFS()
-        test = symbolTables
-        for child in self.children:
+        index = 0
+        while index < len(self.children):
+            child = self.children[index]
             child.buildSymbolTable()
+            if child in self.children:  # child is not removed => update index
+                index += 1
 
         self.endDFS()
 
+    # Check if two nodes in the AST can merge
     def canMerge(self, node):
         return node.__class__ == self.__class__
 
+    # Merge a node with this node
     def merge(self, node):
         node.parent.children.remove(node)
         self.children = node.children + self.children
@@ -187,9 +202,9 @@ class ASTNode(TreeNode):
 
     # Create the llvm code for this node in the AST and if asked in a certain type
     # expects file to be an opened writable file
-    # expects fundDef to be a FuntionDefenitionNode. Only children of such a node need this argument!!
+    # expects funcDef to be a FunctionDefinitionNode. Only children of such a node need this argument!!
     # expects codeBody to be a CodeBodyNode. Only children of such a node need this argument!
-    # expects returnType to be an llvm typename. Only nodes that return a value or variable can use this arhument!
+    # expects returnType to be an llvm typename. Only nodes that return a value or variable can use this argument!
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         # LLVM output part 1 here
         for child in self.children:
@@ -226,8 +241,9 @@ class ProgramNode(ASTNode):
         self.symbolTable = symbolTables.pop()
         self.functionTable = functionTable
 
-        # Optimise global assignments and declarations
+        # Optimise global assignments and declarations, by only executing the last global assignment for a variable
 
+        # Find each global declaration
         declarations = dict()
         for child in self.children:
             if isinstance(child, ConstantDeclarationNode):
@@ -236,9 +252,11 @@ class ProgramNode(ASTNode):
                 else:
                     declarations[child.children[1].children[0].identifier] = child
 
+        # Find the last assignment for each global variable
         for child in reversed(self.children):
             if isinstance(child, ConstantAssignmentNode):
                 identifier = child.children[0].identifier
+                # Move constant Assignment
                 if identifier in declarations:
                     node = declarations[identifier]
                     node.children[1] = child
@@ -269,14 +287,25 @@ class CodeBodyNode(ASTNode):
         symbolTables.append(newSymbolTable)
 
         # Remove unused expressions
-        for child in self.children:
+        # Find out if a codeBody always has a return. It has a return if a return exists in the codeBody, if each
+        # path in the codeBody has a return or if a parent code block has a return
+        # Remove unreachable code
+        index = 0
+        while index < len(self.children):
+            child = self.children[index]
             if isinstance(child, OperationNode):
                 child.printWarning("Unused expression: {}".format(child.text()))
                 self.children.remove(child)
             if isinstance(child, ReturnStatementNode):
                 self.hasReturn = True
+                index = self.children.index(child)
+                if index < len(self.children) - 1:
+                    self.children[-1].printWarning("Unreachable Code")
+                self.children = self.children[:index+1]
             if isinstance(child, IfStatementNode) or isinstance(child, WhileStatementNode):
                 self.pathsWithNoReturn += 2
+            if child in self.children:  # child is not removed => update index
+                index += 1
 
         if not self.hasReturn:
             parent = self.parent
@@ -299,7 +328,7 @@ class CodeBodyNode(ASTNode):
             if isinstance(parent, CodeBodyNode):
                 if not parent.hasReturn:
                     parent.pathsWithNoReturn -= 1
-                    if parent.pathsWithNoReturn == 0:
+                    if parent.pathsWithNoReturn == 0:  # Each separate path has a return
                         parent.hasReturn = True
         if not self.hasReturn and not self.isVoidFunction:
             self.throwError("Control reaches end of non-void function")
@@ -354,6 +383,7 @@ class StatementNode(ASTNode):
 
 class ReturnStatementNode(ASTNode):
 
+    # Throws errors or prints warnings depending on the nominal return type and the effective return type
     def compatibleTypes(self, lhsType, rhsType):
         if lhsType == 'void' and rhsType != 'void':
             self.throwError("void function should not return a value")
@@ -423,6 +453,14 @@ class DereferenceNode(ASTNode):
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.dereference + '"];\n'
 
+    def startDFS(self):
+        # Check if the identifier that is dereferenced exists
+        identifier = self.dereference.split('&')[-1]
+        if not symbolTables[-1].exists(identifier) and not functionTable.exists(identifier):
+            print(symbolTables[-1].symbolTable)
+            raise Exception(
+                "Identifier " + identifier + " not found at " + str(self.line) + ":" + str(self.column))
+
     def type(self):
         identifier = self.dereference[1:]
         type = symbolTables[-1].getEntry(identifier)
@@ -454,6 +492,7 @@ class DepointerNode(ASTNode):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.depointer + '"];\n'
 
     def startDFS(self):
+        # Check if the identifier in the depointer exists in the symbolTable
         identifier = self.depointer.split('*')[-1]
         type = symbolTables[-1].getEntry(identifier)
         if type.count('*') < self.depointer.count('*'):
@@ -464,6 +503,13 @@ class DepointerNode(ASTNode):
         type = symbolTables[-1].getEntry(identifier)
         type = type.split('*')[0] + (type.count('*') - self.depointer.count('*')) * '*'
         return type
+
+    def startDFS(self):
+        identifier = self.depointer.split('*')[-1]
+        if not symbolTables[-1].exists(identifier) and not functionTable.exists(identifier):
+            print(symbolTables[-1].symbolTable)
+            raise Exception(
+                "Identifier " + identifier + " not found at " + str(self.line) + ":" + str(self.column))
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         depointerAmount = 0
@@ -497,7 +543,7 @@ class ElseStatementNode(ASTNode):
 
 class IfStatementNode(ASTNode):
     def startDFS(self):
-        if not isinstance(self.children[1], CodeBodyNode): # If there is only one statement, put it into a codebody
+        if not isinstance(self.children[1], CodeBodyNode):  # If there is only one statement, put it into a codebody
             codeBody = CodeBodyNode()
             codeBody.add(self.children[1])
             self.children[1] = codeBody
@@ -510,7 +556,9 @@ class IfStatementNode(ASTNode):
             if value:  # If statement is always true
                 self.parent.children[index] = self.children[1]
                 self.parent.children[index].parent = self.parent
+                self.children[0].printWarning("Condition is always true")
             else:  # If statement is always false
+                self.children[0].printWarning("Condition is always false")
                 if len(self.children) == 3:  # Else statement
                     self.parent.children[index] = self.children[2].children[0]
                     self.parent.children[index].parent = self.parent
@@ -608,7 +656,7 @@ class WhileStatementNode(ASTNode):
         if isinstance(self.children[0], ValueNode):
             if self.children[0].value:  # always true
                 self.printWarning("Endless loop")
-            else:
+            else: # always false
                 self.printWarning("Condition is always False")
 
 
@@ -631,6 +679,7 @@ class TypeNameNode(ASTNode):
 
 class DeclarationNode(ASTNode):
     def startDFS(self):
+        # Add entry to symbolTable
         typename = self.children[0].typename
         identifier = self.children[1].identifier
         if identifier in reservedWords:
@@ -682,6 +731,7 @@ class ArrayDeclarationNode(ASTNode):
                 "Incompatible pointer types initializing {} with an expression of type {}".format(lhsType, rhsType))
 
     def startDFS(self):
+        # Calculate the array size and add an entry in the SymbolTable
         typename = self.children[0].typename
         identifier = self.children[1].identifier
         size = ' '
@@ -700,6 +750,7 @@ class ArrayDeclarationNode(ASTNode):
         symbolTables[-1].addSymbol(typename, identifier)
 
     def endDFS(self):
+        # Check if the initializing values are compatible with the array type
         typename = self.children[0].typename
         if len(self.children) == 4:
             for child in self.children[3].children:
@@ -736,6 +787,7 @@ class ArrayDeclarationNode(ASTNode):
 
 class ConstantDeclarationNode(DeclarationNode):
     def startDFS(self):
+        # Add an entry in the symbol Table
         typename = self.children[0].typename
         if isinstance(self.children[1], IdentifierNode):
             identifier = self.children[1].identifier
@@ -833,6 +885,7 @@ class ConstantArrayListNode(ArrayListNode):  # TODO: llvm
 
 class FunctionDeclarationNode(ASTNode):
     def startDFS(self):
+        # Create a function table entry and do some rudimentary checks
 
         typename = self.children[0].typename
         identifier = self.children[1].identifier
@@ -939,7 +992,7 @@ class FunctionDefinitionNode(ASTNode):
             symbolTables[-1].addSymbol(typename, identifier)
 
     def endDFS(self):
-        # symbol table is finished, pop from stack
+        # symbol table is finished, pop from stack, set the defined flag to true for this function
         identifier = self.children[0].children[1].identifier
         entry = functionTable.functionTable[identifier]
         functionTable.functionTable[identifier] = (entry[0], entry[1], True)
@@ -1109,6 +1162,7 @@ class CharValueNode(ValueNode):
 
 class FunctionCallNode(ASTNode):
 
+    # Print warnings / throw errors if the given argument type doesn't match the expected type
     def compatibleArgumentTypes(self, lhsType, rhsType):
         if lhsType in ['char', 'int'] and rhsType in ['int', 'float'] and lhsType != rhsType:
             self.printWarning("possible loss of information by assigning type {} to type {}".format(rhsType, lhsType))
@@ -1133,6 +1187,7 @@ class FunctionCallNode(ASTNode):
             self.printWarning("Incompatible pointer types passing {} to parameter of type {}".format(rhsType, lhsType))
 
     def startDFS(self):
+        # Do some rudimentary checks for the function Call
         identifier = self.children[0].identifier
         if not functionTable.exists(identifier):
             self.throwError("Identifier {} not found".format(identifier))
@@ -1339,6 +1394,7 @@ class OperationNode(ASTNode):
 
 
 class SumNode(OperationNode):
+    # Check if the lhs Type and the rhs type are compatible in a sum
     def isCompatibleType(self, type1, type2):
         if type1 in ['int', 'float', 'char'] and type2 in ['int', 'float', 'char']:
             return True
@@ -1351,6 +1407,7 @@ class SumNode(OperationNode):
             self.throwError('{} and {} are not pointers to compatible types'.format(type1, type2))
         self.throwError('Invalid types for binary operator {} : {}, {}'.format(self.operator, type1, type2))
 
+    # Find the correct type for a sum of two types
     def mergeType(self, type1, type2):
         if type1 == type2:
             return type1
@@ -1375,7 +1432,7 @@ class SumNode(OperationNode):
 
     def foldExpression(self):
         OperationNode.foldExpression(self)
-        if len(self.children) == 0: # alles is al gefold door de normale foldExpression
+        if len(self.children) == 0:  # alles is al gefold door de normale foldExpression
             return
         temp = []
         for child in self.children:
@@ -1432,7 +1489,7 @@ class ProductNode(OperationNode):
             if isinstance(child, ValueNode):
                 temp.append(child)
 
-        if len(temp) == 0: # niets kan gefold worden
+        if len(temp) == 0:  # niets kan gefold worden
             return
 
         result = self.mergeOperands(temp)
@@ -1450,6 +1507,8 @@ class ProductNode(OperationNode):
 
 
 class ComparisonNode(OperationNode):
+
+    # Prints a warning / throws an error if there are incompatible types in the comparison
     def isCompatibleType(self, type1, type2):
         if type1[-1] == '*' and type2[-1] == '*' and type1 != type2:
             self.printWarning('Comparison of distinct pointer types : {} , {}'.format(type1, type2))
