@@ -934,7 +934,9 @@ class FunctionDeclarationNode(ASTNode):
             file.write(")")
         elif len(self.children) == 3:
             # define void @f1(i32)
-            for i in range(0, len(self.children[2].children) - 1, 2):
+            for i in range(len(self.children[2].children)):
+                if isinstance(self.children[2].children[i], IdentifierNode):
+                    continue
                 typeAndAsign = llvm.checkTypeAndAlign(self.children[2].children[i].typename)
                 if i != 0:
                     file.write(", ")
