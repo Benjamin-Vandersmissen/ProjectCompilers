@@ -290,13 +290,13 @@ def changeLLVMType(targetType, varName, funcDef, file): #, dereference=False):
 
 # Create the right llvm code to get the value of the searched C or llvm variable and returns the llvm variable name
 # expects varName to be an C or llvm variable name
-def getValueOfVariable(varName, funcDef, codeBody, file):  # TODO: llvm: SHOULD BE OK: type aanpassen, c variabelen zijn nu een pointer van hun type!! (bijna overal nog toepassen)
+def getValueOfVariable(varName, funcDef, codeBody, file):
     if varName[0] == '%':
         typeAndAlign = funcDef.typeAndAlignTable[varName[1:len(varName)]]
     elif varName[0] == '@':
         typeAndAlign = funcDef.parent.typeAndAlignTable[varName[1:len(varName)]]
     else:
-        temp = getLLVMOfCVarible(varName, funcDef, codeBody)  # TODO: llvm: SHOULD BE OK: change type c variable
+        temp = getLLVMOfCVarible(varName, funcDef, codeBody)
         varName = temp[0]
         typeAndAlign = temp[1]
     # Loading a value from a variable is like taking a depointer so delete one star
@@ -320,7 +320,7 @@ def getLLVMOfCVarible(varName, funcDef, codeBody):
 
 
 # Get the llvm type of a variable
-def getLLVMTypeOfVariable(varName, funcDef, codeBody):  # TODO: llvm: SHOULD BE OK: llvm change type c variable => find usages
+def getLLVMTypeOfVariable(varName, funcDef, codeBody):
     if isinstance(varName, str):
         if varName[0] == '%':
             typeAndAlign = funcDef.typeAndAlignTable[varName[1:len(varName)]]
@@ -335,10 +335,10 @@ def getLLVMTypeOfVariable(varName, funcDef, codeBody):  # TODO: llvm: SHOULD BE 
     return typeAndAlign[0]
 
 
-# Store the value of an llvm variable in a llvm variable representing a C variable
+# Store the value of an llvm variable in a llvm variable representing a C variable and return the llvm variable
 # expects varName to be a C variable or better known as identifier
 # expects valueVar to be an llvm varibale, better know as %1 or @a
-def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):  # TODO: llvm: SHOULD BE OK: change c type
+def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):
     if varName in codeBody.counterTable:  # If the wanted variable is a local variable
         localNumber = codeBody.counterTable[varName]
         typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
@@ -349,6 +349,7 @@ def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):  # T
     valueVar = changeLLVMType(typeAndAlign[0][0:-1], valueVar, funcDef, file)
     # store i32 %2, i32* %1, align 4
     file.write('store ' + str(typeAndAlign[0][0:-1]) + ' ' + str(valueVar) + ', ' + str(typeAndAlign[0]) + ' ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
+    return varName
 
 
 # Write the llvm code to do a full operation

@@ -336,7 +336,7 @@ class CodeBodyNode(ASTNode):
     def canMerge(self, node):
         return False
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: SHOULD BE OK: change type c var
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         if codeBody != None:
             self.counterTable = copy.deepcopy(codeBody.counterTable)
         func = isinstance(self.parent, FunctionDefinitionNode)
@@ -353,9 +353,8 @@ class CodeBodyNode(ASTNode):
                 file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0][0:-1]) + ", align " + str(
                     typeAndAlign[1]) + "\n")
                 # store i32 %0, i32* %4, align 4
-                llvm.writeLLVMStoreForCVariable('%' + str(localNumber), '%' + str(localNumber - amountOfArguments - 1), funcDef, self, file)
-                # file.write("store " + str(typeAndAlign[0][0:-1]) + " %" + str(localNumber - amountOfArguments - 1) + ", "
-                #            + str(typeAndAlign[0]) + " %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
+                file.write("store " + str(typeAndAlign[0][0:-1]) + " %" + str(localNumber - amountOfArguments - 1) + ", "
+                           + str(typeAndAlign[0]) + " %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
                 self.counterTable[identifier] = localNumber  # Link the var and localNumber with each other
         returned = False
         for child in self.children:
@@ -467,7 +466,7 @@ class DereferenceNode(ASTNode):
         type = symbolTables[-1].getEntry(identifier)
         return type + '*'
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: SHOULD BE OK: change type C variable
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         temp = llvm.getLLVMOfCVarible(self.dereference[1:len(self.dereference)], funcDef, codeBody)
         varName = temp[0]
         typeAndAlign = temp[1]
@@ -512,7 +511,7 @@ class DepointerNode(ASTNode):
             raise Exception(
                 "Identifier " + identifier + " not found at " + str(self.line) + ":" + str(self.column))
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: SHOULD BE OK: change type c var
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         depointerAmount = 0
         for i in range(len(self.depointer)):
             if self.depointer[i] == '*':
@@ -568,7 +567,7 @@ class IfStatementNode(ASTNode):
 
 
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nog testen met nieuwe aanpassingen
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         ELSE = len(self.children) == 3
         resultLLVMVar = self.children[0].toLLVM(file, funcDef, codeBody)
         # If the llvm var isn't the result from comparison, we have to see if it's zero or not
@@ -679,19 +678,18 @@ class DeclarationNode(ASTNode):
             self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm : SHOULD BE OK: change type c var
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename, True)
         localNumber = funcDef.getLocalNumber(typeAndAlign)
         identifier = self.children[1].identifier
         codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
         # %2 = alloca i32, align 4
-        file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0][0:1]) + ", align " + str(
+        file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][0:-1]) + ', align ' + str(
             typeAndAlign[1]) + "\n")
         if len(self.children) == 3:
             # store i32 %3, i32* %2, align 4
-            llvm.writeLLVMStoreForCVariable('%' + str(localNumber), self.children[2].toLLVM(file, funcDef, codeBody, typeAndAlign[0][0:1]), funcDef, codeBody, file)
-            # file.write("store " + str(typeAndAlign[0][0:1]) + " " + str(self.children[2].toLLVM(file, funcDef, codeBody, typeAndAlign[0][0:1])) + ", " + str(
-            #     typeAndAlign[0]) + " %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
+            file.write('store ' + str(typeAndAlign[0][0:-1]) + ' ' + str(self.children[2].toLLVM(file, funcDef, codeBody, typeAndAlign[0][0:-1])) + ', ' + str(
+                typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
 
 
 class ArrayDeclarationNode(ASTNode):
@@ -791,7 +789,7 @@ class ConstantDeclarationNode(DeclarationNode):
             self.throwError('Invalid usage of reserved keyword {}  as identifier '.format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: SHOULD BE OK: change c type
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename, True)
         valueType = typeAndAlign[0][0:-1]  # C var is a pointer for a value, so the values type is
         if isinstance(self.parent, ProgramNode):
@@ -834,9 +832,8 @@ class ConstantDeclarationNode(DeclarationNode):
             else:
                 identifier = self.children[1].children[0].identifier
                 # store i32 3, i32* %1, align 4
-                llvm.writeLLVMStoreForCVariable('%' + str(localNumber), self.children[1].children[1].toLLVM(file, funcDef, codeBody, valueType), funcDef, codeBody, file)
-                # file.write('store ' + str(valueType) + ' ' + str(self.children[1].children[1].toLLVM(file, funcDef, codeBody, valueType)) + ', ' + str(
-                #     typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
+                file.write('store ' + str(valueType) + ' ' + str(self.children[1].children[1].toLLVM(file, funcDef, codeBody, valueType)) + ', ' + str(
+                    typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
             codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
 
 
@@ -1010,7 +1007,7 @@ class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
         return type.split('[')[0]  # simplistic approach, only works for one dimensional arrays
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        temp = llvm.getLLVMOfCVarible(self.children[0].identifier, funcDef, codeBody)  # TODO: llvm: SHOULD BE OK: change type c variable
+        temp = llvm.getLLVMOfCVarible(self.children[0].identifier, funcDef, codeBody)
         varName = temp[0]
         typeAndAlign = temp [1]
         llvmReturnType = llvm.getArrayTypeInfo(typeAndAlign[0])[1]
@@ -1057,8 +1054,10 @@ class AssignmentNode(ASTNode):
         elif lhsType.count('*') > 0 and lhsType.split('*')[0] != rhsType.split('*')[0]:
             self.printWarning("Incompatible pointer types assigning to {} from {}".format(lhsType, rhsType))
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO; llvm: SHOULD BE OK: change type c var
-        llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+        var = llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
+        if returnType is not None:
+            return llvm.changeLLVMType(returnType, llvm.getValueOfVariable(var, funcDef, codeBody, file), funcDef, file)
 
 
 class ConstantAssignmentNode(AssignmentNode):
@@ -1376,7 +1375,7 @@ class OperationNode(ASTNode):
     def endDFS(self):
         self.foldExpression()
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nieuwe manier van operations (with pointers) TESTEN
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         # operands = list()
         # for child in self.children:
         #     operands.append(child.toLLVM(file, funcDef, codeBody))
@@ -1571,4 +1570,4 @@ class IdentifierNode(ASTNode):
         if returnType is None:
             return llvm.getValueOfVariable(self.identifier, funcDef, codeBody, file)
         else:
-            return
+            return llvm.changeLLVMType(returnType, llvm.getValueOfVariable(self.identifier, funcDef, codeBody, file), funcDef, file)
