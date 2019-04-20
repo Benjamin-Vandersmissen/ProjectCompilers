@@ -687,8 +687,16 @@ class DeclarationNode(ASTNode):
         file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][0:-1]) + ', align ' + str(
             typeAndAlign[1]) + "\n")
         if len(self.children) == 3:
+            value = self.children[2].toLLVM(file, funcDef, codeBody, typeAndAlign[0][0:-1])
+        else:
+            if llvm.isPointer(typeAndAlign[0][0:-1]):
+                value = 'null'
+            elif typeAndAlign[0][0:-1] == 'float':
+                value = '0x0000000000000000'
+            else:
+                value = '0'
             # store i32 %3, i32* %2, align 4
-            file.write('store ' + str(typeAndAlign[0][0:-1]) + ' ' + str(self.children[2].toLLVM(file, funcDef, codeBody, typeAndAlign[0][0:-1])) + ', ' + str(
+            file.write('store ' + str(typeAndAlign[0][0:-1]) + ' ' + str(value) + ', ' + str(
                 typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
 
 
@@ -829,11 +837,18 @@ class ConstantDeclarationNode(DeclarationNode):
                 typeAndAlign[1]) + '\n')
             if isinstance(self.children[1], IdentifierNode):
                 identifier = self.children[1].identifier
+                if llvm.isPointer(valueType):
+                    value = 'null'
+                elif valueType == 'float':
+                    value = '0x0000000000000000'
+                else:
+                    value = '0'
             else:
                 identifier = self.children[1].children[0].identifier
+                value = self.children[1].children[1].toLLVM(file, funcDef, codeBody, valueType)
                 # store i32 3, i32* %1, align 4
-                file.write('store ' + str(valueType) + ' ' + str(self.children[1].children[1].toLLVM(file, funcDef, codeBody, valueType)) + ', ' + str(
-                    typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
+            file.write('store ' + str(valueType) + ' ' + str(value) + ', ' + str(
+                typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
             codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
 
 

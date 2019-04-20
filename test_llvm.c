@@ -92,7 +92,7 @@ void globalIntToLocalPointer(){
 }
 
 void alloctest(){
-    /// test local declaration
+    /// test local declaration (standard 0)
     int x1;
     char x2;
     float x3;
