@@ -336,7 +336,7 @@ class CodeBodyNode(ASTNode):
     def canMerge(self, node):
         return False
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: SHOULD BE OK: change type c var
         if codeBody != None:
             self.counterTable = copy.deepcopy(codeBody.counterTable)
         func = isinstance(self.parent, FunctionDefinitionNode)
@@ -347,14 +347,15 @@ class CodeBodyNode(ASTNode):
             amountOfArguments = len(symbolTable)
             self.parent.counter += amountOfArguments
             for identifier, typename in symbolTable.items():
-                typeAndAlign = llvm.checkTypeAndAlign(typename)
+                typeAndAlign = llvm.checkTypeAndAlign(typename, True)
                 localNumber = funcDef.getLocalNumber(typeAndAlign)
                 # %4 = alloca i32, align 4
-                file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0]) + ", align " + str(
+                file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0][0:-1]) + ", align " + str(
                     typeAndAlign[1]) + "\n")
                 # store i32 %0, i32* %4, align 4
-                file.write("store " + str(typeAndAlign[0]) + " %" + str(localNumber - amountOfArguments - 1) + ", "
-                           + str(typeAndAlign[0]) + "* %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
+                llvm.writeLLVMStoreForCVariable('%' + str(localNumber), '%' + str(localNumber - amountOfArguments - 1), funcDef, self, file)
+                # file.write("store " + str(typeAndAlign[0][0:-1]) + " %" + str(localNumber - amountOfArguments - 1) + ", "
+                #            + str(typeAndAlign[0]) + " %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
                 self.counterTable[identifier] = localNumber  # Link the var and localNumber with each other
         returned = False
         for child in self.children:
@@ -466,14 +467,14 @@ class DereferenceNode(ASTNode):
         type = symbolTables[-1].getEntry(identifier)
         return type + '*'
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: SHOULD BE OK: change type C variable
         temp = llvm.getLLVMOfCVarible(self.dereference[1:len(self.dereference)], funcDef, codeBody)
         varName = temp[0]
         typeAndAlign = temp[1]
         if returnType is None:
-            return llvm.changeLLVMType(str(typeAndAlign[0]) + '*', varName, funcDef, file, True)
+            return llvm.changeLLVMType(str(typeAndAlign[0]), varName, funcDef, file) #, True)  # change c type: deleted " + '*'"
         else:
-            return llvm.changeLLVMType(returnType, varName, funcDef, file, True)
+            return llvm.changeLLVMType(returnType, varName, funcDef, file) #, True)
 
 
 
@@ -511,17 +512,17 @@ class DepointerNode(ASTNode):
             raise Exception(
                 "Identifier " + identifier + " not found at " + str(self.line) + ":" + str(self.column))
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: SHOULD BE OK: change type c var
         depointerAmount = 0
         for i in range(len(self.depointer)):
             if self.depointer[i] == '*':
                 depointerAmount += 1
             if self.depointer[i] != '*':
                 break
-        var = llvm.getValueOfVariable(self.depointer[depointerAmount:len(self.depointer)], funcDef, codeBody, file, True)
-        for _ in range(depointerAmount - 1):
-            var = llvm.getValueOfVariable(var, funcDef, codeBody, file, True)
-        var = llvm.getValueOfVariable(var, funcDef, codeBody, file)
+        var = llvm.getValueOfVariable(self.depointer[depointerAmount:len(self.depointer)], funcDef, codeBody, file)
+        for _ in range(depointerAmount): # - 1):
+            var = llvm.getValueOfVariable(var, funcDef, codeBody, file)
+        # var = llvm.getValueOfVariable(var, funcDef, codeBody, file)
         if returnType is None:
             return var
         else:
@@ -574,48 +575,40 @@ class IfStatementNode(ASTNode):
         if not isinstance(self.children[0], ComparisonNode):
             resultLLVMVar = llvm.writeLLVMCompareWithZero(resultLLVMVar, funcDef, codeBody, file)
 
-        # typeAndAlign1 = llvm.checkTypeAndAlign('label')
-        # label1 = funcDef.getLocalNumber(typeAndAlign1)
         global labelCounter  # TODO: llvm: niet met global counter werken maar deel van de if statement nemen voor naam
         labelCounter += 1
         label1 = 'something' + str(labelCounter)
 
-        # typeAndAlign2 = llvm.checkTypeAndAlign('label')
-        # label2 = funcDef.getLocalNumber(typeAndAlign2)
         labelCounter += 1
         label2 = 'something' + str(labelCounter)
 
         # Check if there's an else statement, if so also pre-write the codeBody of the else statement
         label3 = 'ERROR'
-        tempFile2 = 'ERROR'
         if ELSE:
             labelCounter += 1
             label3 = 'something' + str(labelCounter)
 
-        # br i1 %5, label %6, label %8
+        # br i1 %5, %something1, %something2
         file.write('br i1 ' + str(resultLLVMVar) + ', label %' + str(label1) + ', label %' + str(label2) + '\n\n')
-        # ; <label>:6:
-        # file.write('; <label>:' + str(label1) + ':\n')
+        # something1:
         file.write(label1 + ':\n')
         # codeBody of the if statement
         self.children[1].toLLVM(file, funcDef, codeBody)
         if ELSE:
-            # br label %10
+            # br label %something3
             file.write('br label %' + str(label3) + '\n\n')
         else:
-            # br label %8
+            # br label %something2
             file.write('br label %' + str(label2) + '\n\n')
-        # ; <label>:8:
-        # file.write('\n; <label>:' + str(label2) + ':\n')
+        # something2:
         file.write(label2 + ':\n')
         if ELSE:
             # codeBody of the else statement
             self.children[2].toLLVM(file, funcDef, codeBody)
-            # file.write(tempFile2.text)
-            # br label %10
+
+            # br label %something3
             file.write('br label %' + str(label3) + '\n\n')
-            # ; <label>:10:
-            # file.write('\n; <label>:' + str(label3) + ':\n')
+            # something3:
             file.write(label3 + ':\n')
 
 
@@ -686,18 +679,19 @@ class DeclarationNode(ASTNode):
             self.throwError("Invalid usage of reserved keyword {}  as identifier ".format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename)
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm : SHOULD BE OK: change type c var
+        typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename, True)
         localNumber = funcDef.getLocalNumber(typeAndAlign)
         identifier = self.children[1].identifier
         codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
         # %2 = alloca i32, align 4
-        file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0]) + ", align " + str(
+        file.write("%" + str(localNumber) + " = alloca " + str(typeAndAlign[0][0:1]) + ", align " + str(
             typeAndAlign[1]) + "\n")
         if len(self.children) == 3:
             # store i32 %3, i32* %2, align 4
-            file.write("store " + str(typeAndAlign[0]) + " " + str(self.children[2].toLLVM(file, funcDef, codeBody, typeAndAlign[0])) + ", " + str(
-                typeAndAlign[0]) + "* %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
+            llvm.writeLLVMStoreForCVariable('%' + str(localNumber), self.children[2].toLLVM(file, funcDef, codeBody, typeAndAlign[0][0:1]), funcDef, codeBody, file)
+            # file.write("store " + str(typeAndAlign[0][0:1]) + " " + str(self.children[2].toLLVM(file, funcDef, codeBody, typeAndAlign[0][0:1])) + ", " + str(
+            #     typeAndAlign[0]) + " %" + str(localNumber) + ", align " + str(typeAndAlign[1]) + "\n")
 
 
 class ArrayDeclarationNode(ASTNode):
@@ -773,10 +767,10 @@ class ArrayDeclarationNode(ASTNode):
                 arrayList = self.children[3].children
         typename += ' x ' + str(self.children[0].typename) + ']'
 
-        typeAndAlign = llvm.checkTypeAndAlign(typename)
+        typeAndAlign = llvm.checkTypeAndAlign(typename, True)
         localNumber = funcDef.getLocalNumber(typeAndAlign)
         # %1 = alloca [13 x i32], align 16
-        file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0]) + ', align ' + str(typeAndAlign[1]) + '\n')
+        file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][0:-1]) + ', align ' + str(typeAndAlign[1]) + '\n')
 
         if arrayList is not None:
             for element in arrayList:
@@ -797,25 +791,24 @@ class ConstantDeclarationNode(DeclarationNode):
             self.throwError('Invalid usage of reserved keyword {}  as identifier '.format(identifier))
         symbolTables[-1].addSymbol(typename, identifier)
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename)
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: SHOULD BE OK: change c type
+        typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename, True)
+        valueType = typeAndAlign[0][0:-1]  # C var is a pointer for a value, so the values type is
         if isinstance(self.parent, ProgramNode):
             if isinstance(self.children[1], IdentifierNode):
-                if llvm.isPointer(typeAndAlign[0]):
+                if llvm.isPointer(valueType):
                     standardValue = 'null'
-                elif typeAndAlign[0] == 'float':
+                elif valueType == 'float':
                     standardValue = '0x0000000000000000'
                 else:
                     standardValue = '0'
                 # @a = common global i32 0, align 4
                 identifier = self.children[1].identifier
                 file.write(
-                    '@' + str(identifier) + ' = common global ' + str(typeAndAlign[0]) + ' ' + str(standardValue) + ', align ' +
+                    '@' + str(identifier) + ' = common global ' + str(valueType) + ' ' + str(standardValue) + ', align ' +
                     typeAndAlign[1] + '\n')
 
-            else:  # TODO: llvm: ondersteunen van constant operaties! (waarschijnlijk bepaalde dingen door toLLVm vervangen)
-                #  !!! Moet waarschijnlijk eerst eens zien hoe het moet via website, ik denk alles op 1 lijn (wat wreet ambetant is met hoe het nu gebeurt)
-                # Een temp file, funcDef en codeBody aanmaken, die meegeven aan de write llvm operation, dan deze uitslag da in tempfile is opgeslagen overlopen en de var vervangen zodat lles op 1 lijn komt
+            else:  # If value is given
                 identifier = self.children[1].children[0].identifier
                 # Create temporary variables
                 tempFuncDef = FunctionDefinitionNode()
@@ -823,26 +816,27 @@ class ConstantDeclarationNode(DeclarationNode):
                 tempCodeBody = CodeBodyNode()
                 tempFile = llvm.FileLookALike()
                 # Execute the toLLVM function of the value constantAssignment
-                endVar = self.children[1].children[1].toLLVM(tempFile, tempFuncDef, tempCodeBody, typeAndAlign[0])
+                endVar = self.children[1].children[1].toLLVM(tempFile, tempFuncDef, tempCodeBody, valueType)
                 # Put the outputted llvm commands by the toLLVM function on one line
-                endStr = tempFile.putOnOneLine(endVar)
-                # @a = global i32 5, align 4 or @d11 = local_unnamed_addr global i8* bitcast (i32* getelementptr (i32, i32* @b, i64 32) to i8*), align 8
-                file.write('@' + str(identifier) + ' = global ' + str(typeAndAlign[0]) + ' ' + str(endStr) + ', align ' + typeAndAlign[1] + '\n')
+                endStr = tempFile.putOnOneLine(endVar, tempFuncDef, tempCodeBody)
+                # @a = global i32 5, align 4 or @d11 = global i8* bitcast (i32* getelementptr (i32, i32* @b, i64 32) to i8*), align 8
+                file.write('@' + str(identifier) + ' = global ' + str(valueType) + ' ' + str(endStr) + ', align ' + typeAndAlign[1] + '\n')
 
             self.parent.typeAndAlignTable[identifier] = typeAndAlign
 
         elif isinstance(self.parent, CodeBodyNode):
             # %1 = alloca i32, align 4
             localNumber = funcDef.getLocalNumber(typeAndAlign)
-            file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0]) + ', align ' + str(
+            file.write('%' + str(localNumber) + ' = alloca ' + str(valueType) + ', align ' + str(
                 typeAndAlign[1]) + '\n')
             if isinstance(self.children[1], IdentifierNode):
                 identifier = self.children[1].identifier
             else:
                 identifier = self.children[1].children[0].identifier
                 # store i32 3, i32* %1, align 4
-                file.write('store ' + str(typeAndAlign[0]) + ' ' + str(self.children[1].children[1].toLLVM(file, funcDef, codeBody, self.children[0].typename)) + ', ' + str(
-                    typeAndAlign[0]) + '* %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
+                llvm.writeLLVMStoreForCVariable('%' + str(localNumber), self.children[1].children[1].toLLVM(file, funcDef, codeBody, valueType), funcDef, codeBody, file)
+                # file.write('store ' + str(valueType) + ' ' + str(self.children[1].children[1].toLLVM(file, funcDef, codeBody, valueType)) + ', ' + str(
+                #     typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
             codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
 
 
@@ -1016,13 +1010,14 @@ class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
         return type.split('[')[0]  # simplistic approach, only works for one dimensional arrays
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        temp = llvm.getLLVMOfCVarible(self.children[0].identifier, funcDef, codeBody)
+        temp = llvm.getLLVMOfCVarible(self.children[0].identifier, funcDef, codeBody)  # TODO: llvm: SHOULD BE OK: change type c variable
         varName = temp[0]
         typeAndAlign = temp [1]
         llvmReturnType = llvm.getArrayTypeInfo(typeAndAlign[0])[1]
         localNumber = funcDef.getLocalNumber(llvm.checkTypeAndAlign(llvmReturnType))
         # %2 = getelementptr inbounds [13 x i32], [13 x i32]* %1, i64 0, i64 1
-        file.write('%' + str(localNumber) + ' = getelementptr inbounds ' + str(typeAndAlign[0]) + ', ' + str(typeAndAlign[0]) + '* ' + str(varName) + ', i64 0, i64' + str(self.children[1].value))
+        file.write('%' + str(localNumber) + ' = getelementptr inbounds ' + str(typeAndAlign[0][0:-1]) + ', ' + str(typeAndAlign[0]) + ' ' + str(varName) + ', i64 0, i64' + str(self.children[1].value))
+        llvm.getValueOfVariable('%' + str(localNumber), funcDef, codeBody, file)
 
         if returnType is None:
             return '%' + str(localNumber)
@@ -1062,7 +1057,7 @@ class AssignmentNode(ASTNode):
         elif lhsType.count('*') > 0 and lhsType.split('*')[0] != rhsType.split('*')[0]:
             self.printWarning("Incompatible pointer types assigning to {} from {}".format(lhsType, rhsType))
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO; llvm: SHOULD BE OK: change type c var
         llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
 
 
