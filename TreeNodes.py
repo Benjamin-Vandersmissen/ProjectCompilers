@@ -1026,6 +1026,13 @@ class AssignmentNode(ASTNode):
     def type(self):
         return self.children[0].type()
 
+    def startDFS(self):
+        identifier = self.children[0].identifier
+        if isinstance(self.children[1], IdentifierNode): # Assign identifier to same identifier
+            if identifier == self.children[1].identifier:
+                self.parent.children.remove(self)
+                self.printWarning("Explicitly Assigning variable to itself")
+
     def endDFS(self):
         # Give warnings or errors for type conversion / invalid types for operations
 
