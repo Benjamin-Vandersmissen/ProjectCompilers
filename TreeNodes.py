@@ -475,8 +475,15 @@ class DereferenceNode(ASTNode):
 
     def type(self):
         identifier = self.dereference[1:]
-        type = symbolTables[-1].getEntry(identifier)
-        return type + '*'
+        if len(symbolTables) != 0:  # while building the symbolTables
+            if symbolTables[-1].exists(identifier):
+                return symbolTables[-1].getEntry(identifier) + '*'
+        else:
+            parent = self.parent
+            while parent.symbolTable is None:
+                parent = parent.parent
+            if parent.symbolTable.exists(identifier):
+                return parent.symbolTable.getEntry(identifier) + '*'
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         temp = llvm.getLLVMOfCVarible(self.dereference[1:len(self.dereference)], funcDef, codeBody)
@@ -790,7 +797,7 @@ class ArrayDeclarationNode(ASTNode):
         localNumber = funcDef.getLocalNumber(typeAndAlign)
         codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
         # %1 = alloca [13 x i32], align 16
-        file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][0:-1]) + ', align ' + str(typeAndAlign[1]) + '\n')
+        file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][0:-1]) + ', align ' + str(1) + '\n')
 
         if arrayList is not None:
 
