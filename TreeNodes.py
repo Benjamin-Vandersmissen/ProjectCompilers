@@ -795,7 +795,7 @@ class ArrayDeclarationNode(ASTNode):
         if arrayList is not None:
 
             localNumber2 = funcDef.getLocalNumber(('i8*', 1))
-            file.write('%{} = bitcast {}* %{} to i8*\n'.format(localNumber2, typeAndAlign[0], localNumber))
+            file.write('%{} = bitcast {} %{} to i8*\n'.format(localNumber2, typeAndAlign[0], localNumber))
 
             # Prepend the global declaration of the constant
             file.flush()
@@ -811,12 +811,14 @@ class ArrayDeclarationNode(ASTNode):
 
             constantDeclaration += llvmIdentifier
 
-            constantDeclaration += ' = private unnamed_addr constant {} ['.format(typeAndAlign[0])
+            constantDeclaration += ' = private unnamed_addr constant {} ['.format(typeAndAlign[0][:-1])
+
+            type = llvm.getArrayTypeInfo(typeAndAlign[0][:-1])[1]
 
             for element in arrayList:
                 typeAndAlign2 = llvm.checkTypeAndAlign(element.type())
                 varName = element.toLLVM(file, funcDef, codeBody)
-                constantDeclaration += "{} {}".format(typeAndAlign2[0], varName)
+                constantDeclaration += "{} {}".format(type, varName)
                 if element != arrayList[-1]:
                     constantDeclaration += ', '
             constantDeclaration += '], align {}\n'.format(typeAndAlign2[1])
@@ -1300,10 +1302,6 @@ class FunctionCallNode(ASTNode):
         for i in range(len(self.children[1].children)):
             child = self.children[1].children[i]
             loc = child.toLLVM(file, funcDef, codeBody)
-            if llvm.getArrayTypeInfo(child.type()) :# Convert to equivalent pointer
-                arrayTypeInfo = llvm.getArrayTypeInfo(child.type())
-                data = llvm.checkTypeAndAlign(arrayTypeInfo[1])
-                localNumber = funcDef.getLocalNumber(data)
 
             if i < len(argumentTypes) and argumentTypes[i] != '...':
                 arguments.append(llvm.changeLLVMType(llvm.checkTypeAndAlign(argumentTypes[i])[0], loc, funcDef, file))
@@ -1321,7 +1319,7 @@ class FunctionCallNode(ASTNode):
             file.write('signext ')
         file.write(str(typeAndAlign[0]))
         if argumentTypes[-1] == '...':
-            file.write(' (i8*, ...)') #TODO: remove hardcode?
+            file.write(' (i8*, ...)')
         file.write(' @' + str(self.children[0].identifier + '('))
         if len(arguments) == 0:
             # call void @f2()
@@ -1333,7 +1331,11 @@ class FunctionCallNode(ASTNode):
                 typeAndAlign = llvm.checkTypeAndAlign(child.type())
                 if i != 0:
                     file.write(', ')
-                file.write(str(typeAndAlign[0]))
+                if llvm.getArrayTypeInfo(typeAndAlign[0]):  # convert array to pointer
+                    type = (llvm.convertArrayToPointer(llvm.getArrayTypeInfo(typeAndAlign[0])))
+                    file.write(type)
+                else:
+                    file.write(str(typeAndAlign[0]))
                 if typeAndAlign[0] == 'i8':
                     file.write(' signext')
                 file.write(' ' + str(arguments[i]))

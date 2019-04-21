@@ -110,6 +110,10 @@ def getArrayTypeInfo(arrayType):
         return int(arrayType.split('[')[1][:-1]), arrayType.split('[')[0]
     return False
 
+# Converts an array to a pointer of the same type
+# Expects an arrayType from getArrayTypeInfo
+def convertArrayToPointer(type):
+    return type[1] + '*'
 
 # Cast the C type to the correct format for llvm and gives the align number, if not known returns false
 def checkTypeAndAlign(typename, CVariable=False):
@@ -219,8 +223,8 @@ def changeLLVMType(targetType, varName, funcDef, file): #, dereference=False):
         if getArrayTypeInfo(varType): # If the variable is an array
             # %4 = getelementptr inbounds [6 x i8], [6 x i8]* %1, i32 0, i32 0
             localNumber = funcDef.getLocalNumber(checkTypeAndAlign(targetType))
-            file.write('%' + str(localNumber) + ' = getelementptr inbounds {}, {}* {}, i32 0, i32 0\n'.
-                       format(varType, varType, varName))
+            file.write('%' + str(localNumber) + ' = getelementptr inbounds {}, {} {}, i32 0, i32 0\n'.
+                       format(varType[:-1], varType, varName))
             return '%' + str(localNumber)
         if isPointer(varType):  # If the variable is already a pointer
             if isPointer(targetType):  # If target type is a pointer
@@ -312,6 +316,10 @@ def getValueOfVariable(varName, funcDef, codeBody, file):
     localNumber = funcDef.getLocalNumber(checkTypeAndAlign(typeAndAlign[0][0:-1]))
     # %3 = load i32, i32* <@a/%1>, align 4
     file.write('%' + str(localNumber) + ' = load ' + str(typeAndAlign[0][0:-1]) + ', ' + str(typeAndAlign[0]) + ' ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
+
+    if getArrayTypeInfo(typeAndAlign[0]):
+        return varName
+
     return '%' + str(localNumber)
 
 
