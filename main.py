@@ -25,7 +25,7 @@ def main(argv):
     listener.AST.toDot(dotFile)
     dotFile.close()
 
-    llvmFile = open("program.ll", "w")
+    llvmFile = open("program.ll", "w+")
     listener.AST.toLLVM(llvmFile)
     llvmFile.close()
 

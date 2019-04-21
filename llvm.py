@@ -101,6 +101,8 @@ def getArrayTypeInfo(arrayType):
         for i in range(len(arrayType)):
             if arrayType[i] == ' ':
                 return int(arrayType[1:i]), arrayType[i+3:-1]
+    elif '[' in arrayType:
+        return int(arrayType.split('[')[1][:-1]), arrayType.split('[')[0]
     return False
 
 
@@ -206,6 +208,12 @@ def changeLLVMType(targetType, varName, funcDef, file, dereference=False):
         varType = typeAndAlign[0]
         operation = 'ERROR'
         originalTargetType = 'ERROR'
+        if getArrayTypeInfo(varType): # If the variable is an array
+            # %4 = getelementptr inbounds [6 x i8], [6 x i8]* %1, i32 0, i32 0
+            localNumber = funcDef.getLocalNumber(checkTypeAndAlign(targetType))
+            file.write('%' + str(localNumber) + ' = getelementptr inbounds {}, {}* {}, i32 0, i32 0\n'.
+                       format(varType, varType, varName))
+            return '%' + str(localNumber)
         if isPointer(varType):  # If the variable is already a pointer
             if isPointer(targetType):  # If target type is a pointer
                 operation = 'bitcast'

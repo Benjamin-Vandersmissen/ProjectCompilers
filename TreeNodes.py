@@ -5,6 +5,8 @@ symbolTables = list()
 reservedWords = ['if', 'else', 'return', 'while', 'char', 'int', 'float', 'void']
 labelCounter = 0
 
+constantTable = dict()
+
 
 class TreeNode:
     def text(self):
@@ -268,6 +270,16 @@ class ProgramNode(ASTNode):
     def processToken(self, token):
         if token == '#include <stdio.h>':
             self.useSTDIO = True
+
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+        if self.useSTDIO:  # declare the imported IO functions
+            file.write('declare i32 @printf(i8*, ...)\n')
+            file.write('declare i32 @scanf(i8*, ...)\n')
+
+        # used for arrays
+        file.write('declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture writeonly, i8* nocapture readonly, i64, i32, i1)')
+        for child in self.children:
+            child.toLLVM(file)
 
 
 class CodeBodyNode(ASTNode):
@@ -764,6 +776,7 @@ class ArrayDeclarationNode(ASTNode):
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm (constant) array declaration
         arrayList = None
         typename = '['
+        identifier = self.children[1].identifier
         if isinstance(self.children[2], ConstantArrayListNode):
             arrayList = self.children[2].children
             typename += str(len(self.children[2].children))
@@ -775,15 +788,46 @@ class ArrayDeclarationNode(ASTNode):
 
         typeAndAlign = llvm.checkTypeAndAlign(typename)
         localNumber = funcDef.getLocalNumber(typeAndAlign)
+        codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
         # %1 = alloca [13 x i32], align 16
         file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0]) + ', align ' + str(typeAndAlign[1]) + '\n')
 
         if arrayList is not None:
+
+            localNumber2 = funcDef.getLocalNumber(('i8*', 1))
+            file.write('%{} = bitcast {}* %{} to i8*\n'.format(localNumber2, typeAndAlign[0], localNumber))
+
+            # Prepend the global declaration of the constant
+            file.flush()
+
+            content = open(file.name).read()
+            file.seek(0, 0)
+
+            constantDeclaration = ''
+            llvmIdentifier = '@{}'.format(identifier)
+            if identifier in constantTable:
+
+                llvmIdentifier += '.{}'.format(constantTable[identifier])
+
+            constantDeclaration += llvmIdentifier
+
+            constantDeclaration += ' = private unnamed_addr constant {} ['.format(typeAndAlign[0])
+
             for element in arrayList:
+                typeAndAlign2 = llvm.checkTypeAndAlign(element.type())
                 varName = element.toLLVM(file, funcDef, codeBody)
-                # TODO: llvm: Hoe verder maken? (internet)
+                constantDeclaration += "{} {}".format(typeAndAlign2[0], varName)
+                if element != arrayList[-1]:
+                    constantDeclaration += ', '
+            constantDeclaration += '], align {}\n'.format(typeAndAlign2[1])
+            file.write(constantDeclaration + content)
+            file.write("call void @llvm.memcpy.p0i8.p0i8.i64(i8* %{}, i8* getelementptr inbounds ([{} x i8], [{} x i8]* {}, i32 0, i32 0), i64 {}, i32 {}, i1 false)\n"
+                       .format(localNumber2, len(arrayList), len(arrayList), llvmIdentifier, len(arrayList), typeAndAlign2[1]))
 
-
+            if identifier in constantTable:
+                constantTable[identifier] += 1
+            else:
+                constantTable[identifier] = 0
 
 class ConstantDeclarationNode(DeclarationNode):
     def startDFS(self):
@@ -1242,31 +1286,44 @@ class FunctionCallNode(ASTNode):
         argumentTypes = temp[1]
         arguments = []
 
-        for i in range(len(argumentTypes)):
-            loc = self.children[1].children[i].toLLVM(file, funcDef, codeBody)
-            arguments.append(llvm.changeLLVMType(llvm.checkTypeAndAlign(argumentTypes[i])[0], loc, funcDef, file))
+        for i in range(len(self.children[1].children)):
+            child = self.children[1].children[i]
+            loc = child.toLLVM(file, funcDef, codeBody)
+            if llvm.getArrayTypeInfo(child.type()) :# Convert to equivalent pointer
+                arrayTypeInfo = llvm.getArrayTypeInfo(child.type())
+                data = llvm.checkTypeAndAlign(arrayTypeInfo[1])
+                localNumber = funcDef.getLocalNumber(data)
+
+            if i < len(argumentTypes) and argumentTypes[i] != '...':
+                arguments.append(llvm.changeLLVMType(llvm.checkTypeAndAlign(argumentTypes[i])[0], loc, funcDef, file))
+            else:
+                arguments.append(loc)
 
         localNumber = 'ERROR'
-        typeAndAsign = llvm.checkTypeAndAlign(returnType)
+        typeAndAlign = llvm.checkTypeAndAlign(returnType)
         if returnType != 'void':
-            localNumber = funcDef.getLocalNumber(typeAndAsign)
+            localNumber = funcDef.getLocalNumber(typeAndAlign)
             # %8 = call signext i8 @f1(i32 %5, i8 signext %7)
             file.write('%' + str(localNumber) + ' = ')
         file.write('call ')
-        if typeAndAsign[0] == 'i8':
+        if typeAndAlign[0] == 'i8':
             file.write('signext ')
-        file.write(str(typeAndAsign[0]) + ' @' + str(self.children[0].identifier + '('))
+        file.write(str(typeAndAlign[0]))
+        if argumentTypes[-1] == '...':
+            file.write(' (i8*, ...)') #TODO: remove hardcode?
+        file.write(' @' + str(self.children[0].identifier + '('))
         if len(arguments) == 0:
             # call void @f2()
             file.write(')\n')
         else:
             # call void @f2(int %2, int %3)
-            for i in range(len(argumentTypes)):
-                typeAndAsign = llvm.checkTypeAndAlign(argumentTypes[i])
+            for i in range(len(self.children[1].children)):
+                child = self.children[1].children[i]
+                typeAndAlign = llvm.checkTypeAndAlign(child.type())
                 if i != 0:
                     file.write(', ')
-                file.write(str(typeAndAsign[0]))
-                if typeAndAsign[0] == 'i8':
+                file.write(str(typeAndAlign[0]))
+                if typeAndAlign[0] == 'i8':
                     file.write(' signext')
                 file.write(' ' + str(arguments[i]))
             file.write(")\n")
@@ -1576,8 +1633,15 @@ class IdentifierNode(ASTNode):
                 "Identifier " + self.identifier + " not found at " + str(self.line) + ":" + str(self.column))
 
     def type(self):
-        if symbolTables[-1].exists(self.identifier):
-            return symbolTables[-1].getEntry(self.identifier)
+        if len(symbolTables) != 0:  # while building the symbolTables
+            if symbolTables[-1].exists(self.identifier):
+                return symbolTables[-1].getEntry(self.identifier)
+        else:
+            parent = self.parent
+            while parent.symbolTable is None:
+                parent = parent.parent
+            if parent.symbolTable.exists(self.identifier):
+                return parent.symbolTable.getEntry(self.identifier)
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         if returnType is None:
