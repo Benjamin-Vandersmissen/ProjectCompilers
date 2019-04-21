@@ -21,4 +21,5 @@ int main(){
     e[0] = e;
 
     f(c);
+    retrurn 0;
 }

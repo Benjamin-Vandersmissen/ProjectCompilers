@@ -226,7 +226,7 @@ def changeLLVMType(targetType, varName, funcDef, file): #, dereference=False):
             file.write('%' + str(localNumber) + ' = getelementptr inbounds {}, {} {}, i32 0, i32 0\n'.
                        format(varType[:-1], varType, varName))
             return '%' + str(localNumber)
-        if isPointer(varType):  # If the variable is already a pointer
+        if isPointer(varType):  # If the variable is a pointer
             if isPointer(targetType):  # If target type is a pointer
                 operation = 'bitcast'
             elif targetType == 'i64':
@@ -317,7 +317,7 @@ def getValueOfVariable(varName, funcDef, codeBody, file):
     # %3 = load i32, i32* <@a/%1>, align 4
     file.write('%' + str(localNumber) + ' = load ' + str(typeAndAlign[0][0:-1]) + ', ' + str(typeAndAlign[0]) + ' ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
 
-    if getArrayTypeInfo(typeAndAlign[0]):
+    if getArrayTypeInfo(typeAndAlign[0]):  # TODO: Ik snap de logica hier niet?
         return varName
 
     return '%' + str(localNumber)

@@ -906,7 +906,7 @@ class ConstantDeclarationNode(DeclarationNode):
 
 
 class ConstantArrayDeclarationNode(ArrayDeclarationNode):
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nog eens online checken voor globale var
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nog eens online checken voor globale var!!
         if isinstance(self.parent, CodeBodyNode):
             return super().toLLVM(file, funcDef, codeBody, returnType)
         elif isinstance(self.parent, ProgramNode):
@@ -973,12 +973,13 @@ class FunctionDeclarationNode(ASTNode):
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         typeAndAsign = llvm.checkTypeAndAlign(self.children[0].typename)
         declaration = False
-        file.write("\n")
+        # file.write("\n")
         if isinstance(self.parent, FunctionDefinitionNode):
-            file.write("define ")
+            file.write("\ndefine ")
         else:
-            declaration = True
-            file.write("declare ")
+            return
+            # declaration = True
+            # file.write("declare ")
         if typeAndAsign[0] == "i8":
             file.write("signext ")
         file.write(str(typeAndAsign[0]) + " @" + str(self.children[1].identifier + "("))
@@ -1314,9 +1315,9 @@ class FunctionCallNode(ASTNode):
                 arguments.append(llvm.changeLLVMType(llvm.checkTypeAndAlign(argumentTypes[i])[0], loc, funcDef, file))
             else:
                 arguments.append(loc)
-                if self.children[0].identifier == 'printf' or self.children[0].identifier == 'scanf': #printf doesn't like floats, it wants doubles
+                if self.children[0].identifier == 'printf' or self.children[0].identifier == 'scanf':  # printf doesn't like floats, it wants doubles
                     if child.type() == 'float':
-                        #TODO: hacky code, refactor some time?
+                        # TODO: hacky code, refactor some time?
 
                         number = funcDef.getLocalNumber(('double', 4))
                         file.write('%{} = fpext float {} to double\n'.format(number, arguments[-1]))
@@ -1352,7 +1353,7 @@ class FunctionCallNode(ASTNode):
                     type = (llvm.convertArrayToPointer(llvm.getArrayTypeInfo(typeAndAlign[0])))
                     file.write(type)
                 else:
-                    file.write(str(typeAndAlign[0]))
+                    file.write(str(llvm.getLLVMTypeOfVariable(arguments[i], funcDef, codeBody)))
                 if typeAndAlign[0] == 'i8':
                     file.write(' signext')
                 file.write(' ' + str(arguments[i]))

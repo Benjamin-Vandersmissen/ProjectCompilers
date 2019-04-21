@@ -8,6 +8,9 @@ from smallCParser import smallCParser
 
 
 def main(argv):
+    filename = argv[1][0:-2]
+
+    # parse the given c file
     text = FileStream(argv[1])
     lexer = smallCLexer(text)
     stream = CommonTokenStream(lexer)
@@ -15,17 +18,21 @@ def main(argv):
     tree = parser.program()
     if parser._syntaxErrors > 0:
         exit(1)
+
+    # create the AST
     listener = customListener()
     walker = ParseTreeWalker()
     walker.walk(listener, tree)
     parser.addParseListener(listener)
 
-    dotFile = open("AST.dot", "w")
+    # print the AST to a dot file
+    dotFile = open(filename + ".dot", "w")
     listener.AST.buildSymbolTable()
     listener.AST.toDot(dotFile)
     dotFile.close()
 
-    llvmFile = open("program.ll", "w+")
+    # create the llvm code
+    llvmFile = open(filename + ".ll", "w+")
     listener.AST.toLLVM(llvmFile)
     llvmFile.close()
 

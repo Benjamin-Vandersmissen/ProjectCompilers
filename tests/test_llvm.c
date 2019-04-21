@@ -3,7 +3,7 @@
 //
 
 /// test include
-//#include <stdio.h>
+#include <stdio.h>
 
 /// test global declaration
 int x1;
@@ -164,10 +164,11 @@ int f2(){
     return 0;
 }
 
+/// test if, else, while, functioncall, return
 int main(){
     int a = 1 + 'A' + 2.01;
     char e = 'A';
-    float i = 1.01;
+    float i = testDec(g, d, a, &g, &a, &d);
     {
         e = a;
         char a = 12;
@@ -192,6 +193,8 @@ int main(){
             while (a < f * 2) a = a - f;
             if (a < 0) a = 0;
             else {
+                char test[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
+                printf(test, a);
                 if (a == 0) return a;
                 else return a = 0;
             }

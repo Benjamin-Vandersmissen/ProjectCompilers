@@ -3,15 +3,19 @@
 int f();
 
 char f2(){
-    
+    return 'c';
 }
 
 float f3( int a ){
-
+    return 0.0;
 }
 
 void f4( int a, int b) {
 
+}
+
+int f(){
+    return 1;
 }
 
 int main(){
@@ -32,6 +36,8 @@ int main(){
     int g = f(55);
 
     int h = f(9, 9, 8, 7, 6);
+
+    return 0;
 }
 
 #include <stdio.h>
