@@ -1254,7 +1254,7 @@ class FunctionCallNode(ASTNode):
             else:
                 self.printWarning(
                     "Incompatible pointer types passing {} to parameter of type {}".format(rhsType, lhsType))
-        elif lhsType.count('*') > 0 and lhsType.split('*')[0] != rhsType.split('*')[0]:
+        elif lhsType.count('*') > 0 and lhsType.split('*')[0] != rhsType.split('*')[0] and lhsType.split('*')[0] != rhsType.split('[')[0]:
             self.printWarning("Incompatible pointer types passing {} to parameter of type {}".format(rhsType, lhsType))
 
     def startDFS(self):
