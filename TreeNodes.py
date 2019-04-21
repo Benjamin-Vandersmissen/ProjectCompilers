@@ -1314,6 +1314,13 @@ class FunctionCallNode(ASTNode):
                 arguments.append(llvm.changeLLVMType(llvm.checkTypeAndAlign(argumentTypes[i])[0], loc, funcDef, file))
             else:
                 arguments.append(loc)
+                if self.children[0].identifier == 'printf' or self.children[0].identifier == 'scanf': #printf doesn't like floats, it wants doubles
+                    if child.type() == 'float':
+                        #TODO: hacky code, refactor some time?
+
+                        number = funcDef.getLocalNumber(('double', 4))
+                        file.write('%{} = fpext float {} to double\n'.format(number, arguments[-1]))
+                        arguments[-1] = '%' + str(number)
 
         localNumber = 'ERROR'
         typeAndAlign = llvm.checkTypeAndAlign(returnType)
@@ -1336,6 +1343,9 @@ class FunctionCallNode(ASTNode):
             for i in range(len(self.children[1].children)):
                 child = self.children[1].children[i]
                 typeAndAlign = llvm.checkTypeAndAlign(child.type())
+                if typeAndAlign[0] == 'float' and (self.children[0].identifier == 'printf' or self.children[0].identifier == 'scanf'):
+                    #TODO: more hacky code for printf shenanigans
+                    typeAndAlign = ('double', typeAndAlign[1])
                 if i != 0:
                     file.write(', ')
                 if llvm.getArrayTypeInfo(typeAndAlign[0]):  # convert array to pointer
