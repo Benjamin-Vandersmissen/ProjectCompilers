@@ -158,6 +158,8 @@ void alloctest(){
     char testLocalArray[] = {'y', 'o', a, ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
     int* testLocalEmptyArray[2];
     float testLocalArrayToShort[4] = {1, *e1};
+    // TODO: Benjamin: wordt geblocked in AST terwijl dat wel mag --> fix
+//    testGlobalArrayToShort[3] = 10.0036;
 }
 
 float testDec(float f, char c, int i, float* f1, int* i1, char** c2){
