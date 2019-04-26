@@ -5,8 +5,6 @@ symbolTables = list()
 reservedWords = ['if', 'else', 'return', 'while', 'char', 'int', 'float', 'void']
 labelCounter = 0
 
-constantTable = dict()
-
 
 class TreeNode:
     def text(self):
@@ -276,8 +274,6 @@ class ProgramNode(ASTNode):
             file.write('declare i32 @printf(i8*, ...)\n')
             file.write('declare i32 @scanf(i8*, ...)\n')
 
-        # used for arrays
-        file.write('declare void @llvm.memcpy.p0i8.p0i8.i64(i8* nocapture writeonly, i8* nocapture readonly, i64, i32, i1)')
         for child in self.children:
             child.toLLVM(file)
 
@@ -780,11 +776,11 @@ class ArrayDeclarationNode(ASTNode):
                 for child in self.children[2].children:
                     self.compatibleInitializerTypes(typename, child.type())
 
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm (constant) array declaration
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         arrayList = None
         typename = '['
         identifier = self.children[1].identifier
-        if isinstance(self.children[2], ConstantArrayListNode):
+        if isinstance(self.children[2], ArrayListNode):
             arrayList = self.children[2].children
             typename += str(len(self.children[2].children))
         else:
@@ -797,46 +793,23 @@ class ArrayDeclarationNode(ASTNode):
         localNumber = funcDef.getLocalNumber(typeAndAlign)
         codeBody.counterTable[identifier] = localNumber  # Link the C var and localNumber with each other
         # %1 = alloca [13 x i32], align 16
-        file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][0:-1]) + ', align ' + str(1) + '\n')
+        file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][:-1]) + ', align ' + typeAndAlign[1] + '\n')
 
         if arrayList is not None:
+            for child in arrayList:
+                typeAndAlign1 = llvm.checkTypeAndAlign(child.type(), True)
+                localNumber1 = funcDef.getLocalNumber(typeAndAlign1)
+                if child == arrayList[0]:  # Get the pointer
+                    file.write("%{} = getelementptr inbounds {}, {} %{}, i64 0, i64 0\n"
+                               .format(localNumber1, typeAndAlign[0][:-1], typeAndAlign[0], localNumber))
+                else:
+                    file.write("%{} = getelementptr inbounds {}, {} %{}, i64 1\n"
+                               .format(localNumber1, typeAndAlign1[0][:-1], typeAndAlign1[0], localNumber1 - 1))
 
-            localNumber2 = funcDef.getLocalNumber(('i8*', 1))
-            file.write('%{} = bitcast {} %{} to i8*\n'.format(localNumber2, typeAndAlign[0], localNumber))
-
-            # Prepend the global declaration of the constant
-            file.flush()
-
-            content = open(file.name).read()
-            file.seek(0, 0)
-
-            constantDeclaration = ''
-            llvmIdentifier = '@{}'.format(identifier)
-            if identifier in constantTable:
-
-                llvmIdentifier += '.{}'.format(constantTable[identifier])
-
-            constantDeclaration += llvmIdentifier
-
-            constantDeclaration += ' = private unnamed_addr constant {} ['.format(typeAndAlign[0][:-1])
-
-            type = llvm.getArrayTypeInfo(typeAndAlign[0][:-1])[1]
-
-            for element in arrayList:
-                typeAndAlign2 = llvm.checkTypeAndAlign(element.type())
-                varName = element.toLLVM(file, funcDef, codeBody)
-                constantDeclaration += "{} {}".format(type, varName)
-                if element != arrayList[-1]:
-                    constantDeclaration += ', '
-            constantDeclaration += '], align {}\n'.format(typeAndAlign2[1])
-            file.write(constantDeclaration + content)
-            file.write("call void @llvm.memcpy.p0i8.p0i8.i64(i8* %{}, i8* getelementptr inbounds ([{} x i8], [{} x i8]* {}, i32 0, i32 0), i64 {}, i32 {}, i1 false)\n"
-                       .format(localNumber2, len(arrayList), len(arrayList), llvmIdentifier, len(arrayList), typeAndAlign2[1]))
-
-            if identifier in constantTable:
-                constantTable[identifier] += 1
-            else:
-                constantTable[identifier] = 0
+                # Store the value in the pointer
+                file.write("store {} {}, {} {}, align {}\n"
+                           .format(typeAndAlign1[0][:-1], child.toLLVM(file, funcDef, codeBody, returnType),
+                                   typeAndAlign1[0], localNumber1, typeAndAlign1[1]))
 
 class ConstantDeclarationNode(DeclarationNode):
     def startDFS(self):
@@ -912,16 +885,23 @@ class ConstantArrayDeclarationNode(ArrayDeclarationNode):
         elif isinstance(self.parent, ProgramNode):
             arrayList = None
             typename = '['
+            identifier = self.children[1].identifier
             if isinstance(self.children[2], ConstantArrayListNode):
-                 arrayList = self.children[2].children
-                 typename += str(len(self.children[2].children))
+                arrayList = self.children[2].children
+                typename += str(len(self.children[2].children))
             else:
-                 typename += str(len(self.children[2].value))
+                typename += str(len(self.children[2].value))
+                if len(self.children) == 4:
+                    arrayList = self.children[3].children
             typename += ' x ' + str(self.children[0].typename) + ']'
-
-            pass
-            # @Z = global [2 x i32*]
-            file.write('@' + str(self.children[1].identifier) + ' = ')
+            file.write("@{} = global {} [".format(identifier, typename))
+            if arrayList is not None:
+                for child in arrayList:
+                    typeAndAlign = llvm.checkTypeAndAlign(child.type(), True)
+                    file.write("{} {}".format(typeAndAlign[0][:-1], child.toLLVM(file, funcDef, codeBody, returnType)))
+                    if child != arrayList[-1]:
+                        file.write(',')
+            file.write('], align 16\n')
 
 
 
