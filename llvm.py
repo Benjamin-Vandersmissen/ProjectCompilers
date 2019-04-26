@@ -89,9 +89,11 @@ def hex_to_float(h):
 def isPointer(typename):
     if typename[-1] == '*':
         amount = 0
-        for i in range(len(typename)):
+        for i in range(len(typename) - 1, 0, -1):
             if typename[i] == '*':
                 amount += 1
+            elif typename[i] == ']':
+                break
         return amount
     return 0
 
@@ -125,6 +127,9 @@ def checkTypeAndAlign(typename, CVariable=False):
     arrayTypeInfo = getArrayTypeInfo(typename)
     if arrayTypeInfo:
         typename = arrayTypeInfo[1]
+        arrayTypePointerAmount = isPointer(typename)
+        if arrayTypePointerAmount != 0:
+            typename = typename[0:(-arrayTypePointerAmount)]
     # Check the type
     if typename == 'int' or typename == 'i32':
         typename = 'i32'
@@ -152,6 +157,9 @@ def checkTypeAndAlign(typename, CVariable=False):
 
     # If array, create the right type
     if arrayTypeInfo:
+        if arrayTypePointerAmount != 0:
+            for _ in range(arrayTypePointerAmount):
+                typename += '*'
         typename = '[' + str(arrayTypeInfo[0]) + ' x ' + str(typename) + ']'
         align = '16'  # TODO: llvm: ik dacht eerst dat het van de align afhing maar ik denk combinatie met type en lengte
 

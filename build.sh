@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 java -jar antlr-4.7.2-complete.jar -Dlanguage=Python3 smallC.g4 -visitor
 
 if [ -z "$1" ]
@@ -9,6 +9,4 @@ fi
 
 python3 c2llvm.py "$1"
 
-file = echo "$1" | cut -d '.c' -f 2
-
-dot -Tpng "$file.dot" -O
+dot -Tpng "${1%.*}.dot" -o "${1%.*}.png"

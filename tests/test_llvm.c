@@ -49,6 +49,10 @@ int ccc = 7;
 char* d11 = 42 + &b - 10;
 char* d12 = &b + 43 - (&ccc == &a1) + 53;
 
+char testGlobalArray[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
+int* testGlobalEmptyArray[2];
+int testGlobalArrayToShort[4] = {1,2};
+
 /// test function declaration
 float testDec(float, char, int, float*, int*, char**);
 
@@ -150,6 +154,10 @@ void alloctest(){
     float i2 = *i1;
 
     float y2 = *a1 + f * *h1 * (14.04 + 5.96);
+
+    char testLocalArray[] = {'y', 'o', a, ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
+    int* testLocalEmptyArray[2];
+    float testLocalArrayToShort[4] = {1, *e1};
 }
 
 float testDec(float f, char c, int i, float* f1, int* i1, char** c2){
@@ -193,8 +201,10 @@ int main(){
             while (a < f * 2) a = a - f;
             if (a < 0) a = 0;
             else {
-                char test[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
-                printf(test, a);
+                char testLocalArray[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
+                int* testLocalEmptyArray[2];
+                float testLocalArrayToShort[4] = {1,2};
+                printf(testLocalArray, a);
                 if (a == 0) return a;
                 else return a = 0;
             }

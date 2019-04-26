@@ -784,7 +784,7 @@ class ArrayDeclarationNode(ASTNode):
             arrayList = self.children[2].children
             typename += str(len(self.children[2].children))
         else:
-            typename += str(len(self.children[2].value))
+            typename += str(self.children[2].value)
             if len(self.children) == 4:
                 arrayList = self.children[3].children
         typename += ' x ' + str(self.children[0].typename) + ']'
@@ -796,21 +796,50 @@ class ArrayDeclarationNode(ASTNode):
         file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][:-1]) + ', align ' + typeAndAlign[1] + '\n')
 
         childType = llvm.getArrayTypeInfo(typeAndAlign[0])[1]
+        # If the array is initialized, add the values
         if arrayList is not None:
+            formerLocalNumber = 0
             for child in arrayList:
-                typeAndAlign1 = llvm.checkTypeAndAlign(childType)
+                typeAndAlign1 = llvm.checkTypeAndAlign(childType, True)
                 localNumber1 = funcDef.getLocalNumber(typeAndAlign1)
                 if child == arrayList[0]:  # Get the pointer
                     file.write("%{} = getelementptr inbounds {}, {} %{}, i64 0, i64 0\n"
                                .format(localNumber1, typeAndAlign[0][:-1], typeAndAlign[0], localNumber))
+                else:  # Take the pointer of the next element
+                    file.write("%{} = getelementptr inbounds {}, {} %{}, i64 1\n"
+                               .format(localNumber1, childType, typeAndAlign1[0], formerLocalNumber))
+                # Keep the last pointer in mind
+                formerLocalNumber = localNumber1
+                # Store the value in the pointer
+                file.write("store {} {}, {}* %{}, align {}\n"
+                           .format(childType, child.toLLVM(file, funcDef, codeBody, childType),
+                                   childType, localNumber1, typeAndAlign1[1]))
+        length = llvm.getArrayTypeInfo(typeAndAlign[0])[0]
+        if arrayList == None or len(arrayList) < length:
+            if llvm.isPointer(childType):
+                value = 'null'
+            elif childType == 'float':
+                value = '0x0000000000000000'
+            else:
+                value = '0'
+            if arrayList == None:
+                arrayListLen = 0
+            else:
+                arrayListLen = len(arrayList)
+            for i in range(arrayListLen, length):
+                typeAndAlign1 = llvm.checkTypeAndAlign(childType, True)
+                localNumber1 = funcDef.getLocalNumber(typeAndAlign1)
+                if i == 0:
+                    file.write("%{} = getelementptr inbounds {}, {} %{}, i64 0, i64 0\n"
+                               .format(localNumber1, typeAndAlign[0][:-1], typeAndAlign[0], localNumber))
                 else:
                     file.write("%{} = getelementptr inbounds {}, {} %{}, i64 1\n"
-                               .format(localNumber1, childType, typeAndAlign1[0], localNumber1 - 1))
-
-                # Store the value in the pointer
-                file.write("store {} {}, {}* {}, align {}\n"
-                           .format(childType, child.toLLVM(file, funcDef, codeBody, returnType),
+                               .format(localNumber1, childType, typeAndAlign1[0], formerLocalNumber))
+                file.write("store {} {}, {}* %{}, align {}\n"
+                           .format(childType, value,
                                    childType, localNumber1, typeAndAlign1[1]))
+                formerLocalNumber = localNumber1
+
 
 class ConstantDeclarationNode(DeclarationNode):
     def startDFS(self):
@@ -880,7 +909,7 @@ class ConstantDeclarationNode(DeclarationNode):
 
 
 class ConstantArrayDeclarationNode(ArrayDeclarationNode):
-    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):  # TODO: llvm: nog eens online checken voor globale var!!
+    def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         if isinstance(self.parent, CodeBodyNode):
             return super().toLLVM(file, funcDef, codeBody, returnType)
         elif isinstance(self.parent, ProgramNode):
@@ -891,7 +920,7 @@ class ConstantArrayDeclarationNode(ArrayDeclarationNode):
                 arrayList = self.children[2].children
                 typename += str(len(self.children[2].children))
             else:
-                typename += str(len(self.children[2].value))
+                typename += str(self.children[2].value)
                 if len(self.children) == 4:
                     arrayList = self.children[3].children
             typename += ' x ' + str(self.children[0].typename) + ']'
@@ -902,7 +931,24 @@ class ConstantArrayDeclarationNode(ArrayDeclarationNode):
                 for child in arrayList:
                     file.write("{} {}".format(childType, child.toLLVM(file, funcDef, codeBody, returnType)))
                     if child != arrayList[-1]:
-                        file.write(',')
+                        file.write(', ')
+            length = llvm.getArrayTypeInfo(typeAndAlign[0])[0]
+            if arrayList == None or len(arrayList) < length:
+                if llvm.isPointer(childType):
+                    value = 'null'
+                elif childType == 'float':
+                    value = '0x0000000000000000'
+                else:
+                    value = '0'
+                if arrayList == None:
+                    arrayListLen = 0
+                else:
+                    arrayListLen = len(arrayList)
+                    file.write(', ')
+                for i in range(arrayListLen, length):
+                    file.write("{} {}".format(childType, value))
+                    if i != length - 1:
+                        file.write(', ')
             file.write('], align {}\n'.format(typeAndAlign[1]))
 
 
