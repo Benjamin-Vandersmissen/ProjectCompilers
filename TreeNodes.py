@@ -795,21 +795,22 @@ class ArrayDeclarationNode(ASTNode):
         # %1 = alloca [13 x i32], align 16
         file.write('%' + str(localNumber) + ' = alloca ' + str(typeAndAlign[0][:-1]) + ', align ' + typeAndAlign[1] + '\n')
 
+        childType = llvm.getArrayTypeInfo(typeAndAlign[0])[1]
         if arrayList is not None:
             for child in arrayList:
-                typeAndAlign1 = llvm.checkTypeAndAlign(child.type(), True)
+                typeAndAlign1 = llvm.checkTypeAndAlign(childType)
                 localNumber1 = funcDef.getLocalNumber(typeAndAlign1)
                 if child == arrayList[0]:  # Get the pointer
                     file.write("%{} = getelementptr inbounds {}, {} %{}, i64 0, i64 0\n"
                                .format(localNumber1, typeAndAlign[0][:-1], typeAndAlign[0], localNumber))
                 else:
                     file.write("%{} = getelementptr inbounds {}, {} %{}, i64 1\n"
-                               .format(localNumber1, typeAndAlign1[0][:-1], typeAndAlign1[0], localNumber1 - 1))
+                               .format(localNumber1, childType, typeAndAlign1[0], localNumber1 - 1))
 
                 # Store the value in the pointer
-                file.write("store {} {}, {} {}, align {}\n"
-                           .format(typeAndAlign1[0][:-1], child.toLLVM(file, funcDef, codeBody, returnType),
-                                   typeAndAlign1[0], localNumber1, typeAndAlign1[1]))
+                file.write("store {} {}, {}* {}, align {}\n"
+                           .format(childType, child.toLLVM(file, funcDef, codeBody, returnType),
+                                   childType, localNumber1, typeAndAlign1[1]))
 
 class ConstantDeclarationNode(DeclarationNode):
     def startDFS(self):
@@ -895,11 +896,11 @@ class ConstantArrayDeclarationNode(ArrayDeclarationNode):
                     arrayList = self.children[3].children
             typename += ' x ' + str(self.children[0].typename) + ']'
             typeAndAlign = llvm.checkTypeAndAlign(typename, True)
+            childType = llvm.getArrayTypeInfo(typeAndAlign[0])[1]
             file.write("@{} = global {} [".format(identifier, typeAndAlign[0][:-1]))
             if arrayList is not None:
                 for child in arrayList:
-                    typeAndAlign1 = llvm.checkTypeAndAlign(child.type(), True)
-                    file.write("{} {}".format(typeAndAlign1[0][:-1], child.toLLVM(file, funcDef, codeBody, returnType)))
+                    file.write("{} {}".format(childType, child.toLLVM(file, funcDef, codeBody, returnType)))
                     if child != arrayList[-1]:
                         file.write(',')
             file.write('], align {}\n'.format(typeAndAlign[1]))
