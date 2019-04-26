@@ -894,14 +894,15 @@ class ConstantArrayDeclarationNode(ArrayDeclarationNode):
                 if len(self.children) == 4:
                     arrayList = self.children[3].children
             typename += ' x ' + str(self.children[0].typename) + ']'
-            file.write("@{} = global {} [".format(identifier, typename))
+            typeAndAlign = llvm.checkTypeAndAlign(typename, True)
+            file.write("@{} = global {} [".format(identifier, typeAndAlign[0][:-1]))
             if arrayList is not None:
                 for child in arrayList:
-                    typeAndAlign = llvm.checkTypeAndAlign(child.type(), True)
-                    file.write("{} {}".format(typeAndAlign[0][:-1], child.toLLVM(file, funcDef, codeBody, returnType)))
+                    typeAndAlign1 = llvm.checkTypeAndAlign(child.type(), True)
+                    file.write("{} {}".format(typeAndAlign1[0][:-1], child.toLLVM(file, funcDef, codeBody, returnType)))
                     if child != arrayList[-1]:
                         file.write(',')
-            file.write('], align 16\n')
+            file.write('], align {}\n'.format(typeAndAlign[1]))
 
 
 
