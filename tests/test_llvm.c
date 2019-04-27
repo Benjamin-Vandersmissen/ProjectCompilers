@@ -15,7 +15,7 @@ int a = 1 + 'A' + 2.01;  // should be 68
 int b = 'A';  // should be 65
 int c = 1.01;
 
-char d = 1;
+char d = 365;  // Should be 109
 char e = 'A';
 char f = 1.01;
 
@@ -49,7 +49,7 @@ int ccc = 7;
 char* d11 = 42 + &b - 10;
 char* d12 = &b + 43 - (&ccc == &a1) + 53;
 
-char testGlobalArray[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
+char testGlobalArray[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, -129};
 int* testGlobalEmptyArray[2];
 int testGlobalArrayToShort[4] = {1,2};
 

@@ -188,11 +188,11 @@ def valueTransformer(typename, value):
             return round(value)
     elif typename == 'char' or typename == 'i8':
         if isinstance(value, int):
-            return value
+            return ((value - 128) % 256) - 128
         elif isinstance(value, str):
-            return ord(value)
+            return ((ord(value) - 128) % 256) - 128
         elif isinstance(value, float):
-            return int(value)
+            return ((int(value) - 128) % 256) - 128
     elif typename == 'float':
         if isinstance(value, int):
             return str(float_to_hex(float(value))) + '00000000'

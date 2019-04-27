@@ -929,7 +929,7 @@ class ConstantArrayDeclarationNode(ArrayDeclarationNode):
             file.write("@{} = global {} [".format(identifier, typeAndAlign[0][:-1]))
             if arrayList is not None:
                 for child in arrayList:
-                    file.write("{} {}".format(childType, child.toLLVM(file, funcDef, codeBody, returnType)))
+                    file.write("{} {}".format(childType, child.toLLVM(file, funcDef, codeBody, childType)))
                     if child != arrayList[-1]:
                         file.write(', ')
             length = llvm.getArrayTypeInfo(typeAndAlign[0])[0]
