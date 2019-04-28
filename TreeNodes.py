@@ -962,11 +962,11 @@ class ConstantNode(ASTNode):
     pass
 
 
-class ArrayListNode(ASTNode):  # TODO: llvm
+class ArrayListNode(ASTNode):
     pass
 
 
-class ConstantArrayListNode(ArrayListNode):  # TODO: llvm
+class ConstantArrayListNode(ArrayListNode):
     pass
 
 

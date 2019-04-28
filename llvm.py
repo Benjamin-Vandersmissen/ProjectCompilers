@@ -573,7 +573,7 @@ def getLLVMOperatorAndReturnType(operator, type1, type2):
     return operator, type1, type2, returnType, operationType, switched
 
 # Returns the register which has as value a bool which is the result of the comparison between the statement and 0
-def writeLLVMCompareWithZero(resultLLVMVar, funcDef, codeBody, file):  # TODO: llvm: TESTEN compatible met constants (misschien al verkleinen in AST?) -> is gebeurd normaal
+def writeLLVMCompareWithZero(resultLLVMVar, funcDef, codeBody, file):
     # if isinstance(self.children[0], ValueNode): # or child.__class__.__name__[0:8] == 'Constant':
     #     llvmTokens.append(llvm.valueTransformer(llvmReturnType, child.value))
     # else:
