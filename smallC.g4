@@ -66,7 +66,7 @@ declaration
 
 arrayDeclaration
         : typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
-        | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList? CLOSE_CURLY
+        | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE (ASSIGN OPEN_CURLY arrayList? CLOSE_CURLY)?
         ;
 
 constantDeclaration

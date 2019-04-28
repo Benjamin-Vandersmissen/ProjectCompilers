@@ -784,7 +784,7 @@ class ArrayDeclarationNode(ASTNode):
             arrayList = self.children[2].children
             typename += str(len(self.children[2].children))
         else:
-            typename += str(self.children[2].value)
+            typename += str(self.children[2].toLLVM(file, funcDef, codeBody, 'i32'))
             if len(self.children) == 4:
                 arrayList = self.children[3].children
         typename += ' x ' + str(self.children[0].typename) + ']'

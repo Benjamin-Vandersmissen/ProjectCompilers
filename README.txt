@@ -1,6 +1,3 @@
-Not working:
-- constant declaration of array (normal with variables do work)
-
 optional requirements:
 - constant folding
 - skipping code after return statement
