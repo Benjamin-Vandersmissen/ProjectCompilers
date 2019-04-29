@@ -44,6 +44,7 @@ class customListener(smallCListener):
 
     def popStack(self):
 
+        # als er 1 kind is, verwijder dan de tussenliggende node
         if len(self.AST.children) == 1 and self.AST.parent is not None \
                 and not isinstance(self.AST, ReturnStatementNode) and not isinstance(self.AST, ArrayListNode) and \
                 not isinstance(self.AST, ConstantArrayListNode) and not isinstance(self.AST, ArgumentListNode) and \
@@ -52,6 +53,7 @@ class customListener(smallCListener):
             self.AST.parent.add(self.AST.children[0])
             self.AST.parent.children.remove(self.AST)
 
+        # merged nodes met zijn kind, bijvoorbeeld een + met als kind een int en een plus, dan worden de plusjes samengevoegd
         for child in self.AST.children:
             if self.AST.canMerge(child):
                 self.AST.merge(child)

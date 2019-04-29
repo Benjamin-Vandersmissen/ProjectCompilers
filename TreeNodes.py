@@ -465,7 +465,6 @@ class DereferenceNode(ASTNode):
         # Check if the identifier that is dereferenced exists
         identifier = self.dereference.split('&')[-1]
         if not symbolTables[-1].exists(identifier) and not functionTable.exists(identifier):
-            print(symbolTables[-1].symbolTable)
             raise Exception(
                 "Identifier " + identifier + " not found at " + str(self.line) + ":" + str(self.column))
 
@@ -506,13 +505,6 @@ class DepointerNode(ASTNode):
     def dotRepresentation(self):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.depointer + '"];\n'
 
-    def startDFS(self):
-        # Check if the identifier in the depointer exists in the symbolTable
-        identifier = self.depointer.split('*')[-1]
-        type = symbolTables[-1].getEntry(identifier)
-        if type.count('*') < self.depointer.count('*'):
-            self.throwError("Indirection requires pointer operand ('{}' invalid)".format(type.split('*')[0]))
-
     def type(self):
         identifier = self.depointer.split('*')[-1]
         type = symbolTables[-1].getEntry(identifier)
@@ -525,6 +517,9 @@ class DepointerNode(ASTNode):
             print(symbolTables[-1].symbolTable)
             raise Exception(
                 "Identifier " + identifier + " not found at " + str(self.line) + ":" + str(self.column))
+        type = symbolTables[-1].getEntry(identifier)
+        if type.count('*') < self.depointer.count('*'):
+            self.throwError("Indirection requires pointer operand ('{}' invalid)".format(type.split('*')[0]))
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         depointerAmount = 0
@@ -1289,8 +1284,12 @@ class FunctionCallNode(ASTNode):
     def startDFS(self):
         # Do some rudimentary checks for the function Call
         identifier = self.children[0].identifier
+
+        # check if function exists
         if not functionTable.exists(identifier):
             self.throwError("Identifier {} not found".format(identifier))
+
+        # check if function is defined
         if not functionTable.isDefined(identifier):
             self.throwError("Function {} is not defined".format(identifier))
 
@@ -1426,9 +1425,10 @@ class OperationNode(ASTNode):
         return '\t"' + self.name() + '_' + str(self.id) + '"[label="' + self.operator + '"];\n'
 
     def isCompatibleType(self, type1, type2):
+        # Should never be accessed by program
         self.throwError('Invalid types for binary operator {} : {}, {}'.format(self.operator, type1, type2))
 
-    def mergeType(self, tpye1, type2):
+    def mergeType(self, type1, type2):
         raise Exception("Not implemented for class {}".format(self.__class__))
 
     def mergeOperands(self, operands, specialCase=False):
@@ -1493,6 +1493,7 @@ class OperationNode(ASTNode):
             newChildren.append(self.mergeOperands(temp, temp[0] != self.children[0]))
         self.children.clear()
         if len(newChildren) == 1:
+            # operation consists of only 1 child, push the child up
             index = self.parent.children.index(self)
             self.parent.children[index] = newChildren[0]
             self.parent.children[index].parent = self.parent

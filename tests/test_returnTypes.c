@@ -44,6 +44,7 @@ void f8(){
     return 1;
 }
 
+//should throw error
 int f9(){
     return;
 }
