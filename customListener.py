@@ -317,6 +317,14 @@ class customListener(smallCListener):
     def exitAssignment(self, ctx: smallCParser.AssignmentContext):
         self.popStack()
 
+    # Enter a parse tree produced by smallCParser#operatorAssignment.
+    def enterOperatorAssignment(self, ctx:smallCParser.OperatorAssignmentContext):
+        self.generateBranch(OperatorAssignmentNode(), ctx)
+
+    # Exit a parse tree produced by smallCParser#operatorAssignment.
+    def exitOperatorAssignment(self, ctx:smallCParser.OperatorAssignmentContext):
+        self.popStack()
+
     # Enter a parse tree produced by smallCParser#constantAssignment.
     def enterConstantAssignment(self, ctx: smallCParser.ConstantAssignmentContext):
         self.generateBranch(ConstantAssignmentNode(), ctx)

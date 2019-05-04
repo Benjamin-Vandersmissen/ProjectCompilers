@@ -164,6 +164,11 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by smallCParser#operatorAssignment.
+    def visitOperatorAssignment(self, ctx:smallCParser.OperatorAssignmentContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#constantAssignment.
     def visitConstantAssignment(self, ctx:smallCParser.ConstantAssignmentContext):
         return self.visitChildren(ctx)

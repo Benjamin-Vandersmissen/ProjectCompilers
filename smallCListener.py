@@ -287,6 +287,15 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#operatorAssignment.
+    def enterOperatorAssignment(self, ctx:smallCParser.OperatorAssignmentContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#operatorAssignment.
+    def exitOperatorAssignment(self, ctx:smallCParser.OperatorAssignmentContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#constantAssignment.
     def enterConstantAssignment(self, ctx:smallCParser.ConstantAssignmentContext):
         pass

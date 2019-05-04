@@ -1117,15 +1117,18 @@ class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
 
 
 class AssignmentNode(ASTNode):
+    #TODO: fix assignments to array elements
     def type(self):
         return self.children[0].type()
 
     def startDFS(self):
-        identifier = self.children[0].identifier
-        if isinstance(self.children[1], IdentifierNode): # Assign identifier to same identifier
-            if identifier == self.children[1].identifier:
-                self.parent.children.remove(self)
-                self.printWarning("Explicitly Assigning variable to itself")
+        # TODO: check this for array elements assigning to self as well
+        if not isinstance(self.children[0], ArrayElementNode):
+            identifier = self.children[0].identifier
+            if isinstance(self.children[1], IdentifierNode):  # Assign identifier to same identifier
+                if identifier == self.children[1].identifier:
+                    self.parent.children.remove(self)
+                    self.printWarning("Explicitly Assigning variable to itself")
 
     def endDFS(self):
         # Give warnings or errors for type conversion / invalid types for operations
@@ -1654,6 +1657,45 @@ class ComparisonNode(OperationNode):
                 if self.isCompatibleType(type, child.type()):
                     type = self.mergeType(type, child.type())
         return type
+
+
+class OperatorAssignmentNode(ASTNode):
+    def __init__(self):
+        ASTNode.__init__(self)
+        self.operator = None
+
+    def processToken(self, token):
+        if token != '=':
+            self.operator = token
+
+    def alias(self):
+        index = self.parent.children.index(self)
+        assignment = AssignmentNode()
+        assignment.parent = self.parent
+        self.parent.children[index] = assignment
+        assignment.add(self.children[0])
+
+        operation = None
+        if self.operator == '+' or self.operator == '-':
+            operation = SumNode()
+        elif self.operator == '*' or self.operator == '/':
+            operation = ProductNode()
+
+        operation.operator = self.operator
+
+        lhs = copy.deepcopy(self.children[0])
+        lhs.id = lhs.count
+        lhs.count += 1
+        operation.add(lhs)
+        operation.add(self.children[1])
+
+        assignment.add(operation)
+
+        return assignment
+
+    def startDFS(self):
+        alias = self.alias()
+        alias.buildSymbolTable()
 
 
 class ConstantComparisonNode(ComparisonNode):

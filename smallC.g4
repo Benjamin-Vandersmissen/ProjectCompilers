@@ -16,6 +16,7 @@ codeBody
 
 statement
         : constantAssignment
+        | operatorAssignment
         | assignment
         | declaration
         | constantExpression
@@ -116,6 +117,10 @@ arrayElement
 assignment
         : (identifier|dereference|depointer) ASSIGN expression
         | arrayElement ASSIGN expression
+        ;
+
+operatorAssignment
+        : (identifier|dereference|depointer|arrayElement) (PLUS|MINUS|STAR|FORWARD_SLASH) ASSIGN expression
         ;
 
 constantAssignment
