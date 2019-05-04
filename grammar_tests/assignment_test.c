@@ -18,4 +18,6 @@ int main(int argc, char** argv){
         blablabla
     */
     int aaa;
+
+    return aaa;
 }

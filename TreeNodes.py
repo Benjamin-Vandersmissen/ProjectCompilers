@@ -992,7 +992,6 @@ class FunctionDeclarationNode(ASTNode):
 
         functionTable.addFunction(typename, identifier, arguments, False)
 
-
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         typeAndAsign = llvm.checkTypeAndAlign(self.children[0].typename)
         declaration = False
@@ -1103,17 +1102,17 @@ class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         temp = llvm.getLLVMOfCVarible(self.children[0].identifier, funcDef, codeBody)
         varName = temp[0]
-        typeAndAlign = temp [1]
-        llvmReturnType = llvm.getArrayTypeInfo(typeAndAlign[0])[1]
+        typeAndAlign = temp[1]
+        llvmReturnType = llvm.getArrayTypeInfo(typeAndAlign[0])[1] + '*'
         localNumber = funcDef.getLocalNumber(llvm.checkTypeAndAlign(llvmReturnType))
         # %2 = getelementptr inbounds [13 x i32], [13 x i32]* %1, i64 0, i64 1
-        file.write('%' + str(localNumber) + ' = getelementptr inbounds ' + str(typeAndAlign[0][0:-1]) + ', ' + str(typeAndAlign[0]) + ' ' + str(varName) + ', i64 0, i64' + str(self.children[1].value))
-        llvm.getValueOfVariable('%' + str(localNumber), funcDef, codeBody, file)
+        file.write('%' + str(localNumber) + ' = getelementptr inbounds ' + str(typeAndAlign[0][0:-1]) + ', ' + str(typeAndAlign[0]) + ' ' + str(varName) + ', i64 0, i64 ' + str(self.children[1].value) + '\n')
+        varName = llvm.getValueOfVariable('%' + str(localNumber), funcDef, codeBody, file)
 
         if returnType is None:
-            return '%' + str(localNumber)
+            return varName
         else:
-            return llvm.changeLLVMType(returnType, '%' + str(localNumber), funcDef, file)
+            return llvm.changeLLVMType(returnType, varName, funcDef, file)
 
 
 class AssignmentNode(ASTNode):
@@ -1349,7 +1348,7 @@ class FunctionCallNode(ASTNode):
                     if child.type() == 'float':
                         # TODO: hacky code, refactor some time?
 
-                        number = funcDef.getLocalNumber(('double', 4))
+                        number = funcDef.getLocalNumber(('i64', '8'))
                         file.write('%{} = fpext float {} to double\n'.format(number, arguments[-1]))
                         arguments[-1] = '%' + str(number)
 
