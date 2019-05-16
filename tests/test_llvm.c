@@ -22,6 +22,8 @@ char f = 1.01;
 float g = 1;
 float h = 'A';
 float i = 1.01;
+float o1 = 0;
+float o2 = 0.0;
 
 /// test order of operators
 int y = 3*8-3*(8+4)/1+12; // should be 0

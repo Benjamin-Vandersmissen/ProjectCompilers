@@ -998,7 +998,7 @@ class FunctionDeclarationNode(ASTNode):
         functionTable.addFunction(typename, identifier, arguments, False)
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        typeAndAsign = llvm.checkTypeAndAlign(self.children[0].typename)
+        typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename)
         declaration = False
         # file.write("\n")
         if isinstance(self.parent, FunctionDefinitionNode):
@@ -1007,9 +1007,9 @@ class FunctionDeclarationNode(ASTNode):
             return
             # declaration = True
             # file.write("declare ")
-        if typeAndAsign[0] == "i8":
+        if typeAndAlign[0] == "i8":
             file.write("signext ")
-        file.write(str(typeAndAsign[0]) + " @" + str(self.children[1].identifier + "("))
+        file.write(str(typeAndAlign[0]) + " @" + str(self.children[1].identifier + "("))
         if len(self.children) == 2:
             # define i32 @main()
             file.write(")")
@@ -1018,11 +1018,11 @@ class FunctionDeclarationNode(ASTNode):
             for i in range(len(self.children[2].children)):
                 if isinstance(self.children[2].children[i], IdentifierNode):
                     continue
-                typeAndAsign = llvm.checkTypeAndAlign(self.children[2].children[i].typename)
+                typeAndAlign = llvm.checkTypeAndAlign(self.children[2].children[i].typename)
                 if i != 0:
                     file.write(", ")
-                file.write(str(typeAndAsign[0]))
-                if typeAndAsign[0] == "i8":
+                file.write(str(typeAndAlign[0]))
+                if typeAndAlign[0] == "i8":
                     file.write(" signext")
             file.write(") ")
         if declaration:
