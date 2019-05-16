@@ -115,6 +115,19 @@ void alloctest(){
     float g = 1;
     float h = 'A';
     float i = 1.01;
+    
+    /// test local defenition with global variable
+    int a3 = a;
+    int b3 = d;
+    int c3 = g;
+
+    char d3 = b;
+    char e3 = e;
+    char f3 = h;
+
+    float g3 = c;
+    float h3 = f;
+    float i3 = i;
 
     /// test order of operators
     int y = 3*8-3*(8+4)/1+12; // should be 0

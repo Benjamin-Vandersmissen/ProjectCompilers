@@ -710,9 +710,9 @@ class DeclarationNode(ASTNode):
                 value = '0x0000000000000000'
             else:
                 value = '0'
-            # store i32 %3, i32* %2, align 4
-            file.write('store ' + str(typeAndAlign[0][0:-1]) + ' ' + str(value) + ', ' + str(
-                typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
+        # store i32 %3, i32* %2, align 4
+        file.write('store ' + str(typeAndAlign[0][0:-1]) + ' ' + str(value) + ', ' + str(
+            typeAndAlign[0]) + ' %' + str(localNumber) + ', align ' + str(typeAndAlign[1]) + '\n')
 
 
 class ArrayDeclarationNode(ASTNode):
