@@ -124,8 +124,7 @@ operatorAssignment
         ;
 
 constantAssignment
-        : identifier (OPEN_SQUARE constantExpression? CLOSE_SQUARE)? ASSIGN constantExpression
-//        | arrayElement ASSIGN constantExpression //TODO: constant array element assignment geeft error
+        : identifier ASSIGN constantExpression
         ;
         
 functionCall

@@ -211,6 +211,11 @@ class ASTNode(TreeNode):
             child.toLLVM(file)
         # LLVM output part 2 here
 
+    def toMIPS(self, file):
+
+        for child in self.children:
+            child.toLLVM(file)
+
     def processToken(self, token):
         # empty function to be overridden in derived classes
         pass
@@ -1116,7 +1121,6 @@ class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
 
 
 class AssignmentNode(ASTNode):
-    #TODO: fix assignments to array elements
     def type(self):
         return self.children[0].type()
 
@@ -1158,6 +1162,7 @@ class AssignmentNode(ASTNode):
             self.printWarning("Incompatible pointer types assigning to {} from {}".format(lhsType, rhsType))
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
+        # TODO : fix for writing to array element
         var = llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
         if returnType is not None:
             return llvm.changeLLVMType(returnType, llvm.getValueOfVariable(var, funcDef, codeBody, file), funcDef, file)
