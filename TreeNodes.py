@@ -211,11 +211,6 @@ class ASTNode(TreeNode):
             child.toLLVM(file)
         # LLVM output part 2 here
 
-    def toMIPS(self, file):
-
-        for child in self.children:
-            child.toLLVM(file)
-
     def processToken(self, token):
         # empty function to be overridden in derived classes
         pass
@@ -625,7 +620,10 @@ class IfStatementNode(ASTNode):
             # something3:
             file.write(label3 + ':\n')
 
+    def toMIPS(self, file):
 
+        for child in self.children:
+            child.toMIPS(file)
 
 class WhileStatementNode(ASTNode):
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
@@ -1300,13 +1298,15 @@ class FunctionCallNode(ASTNode):
         if not functionTable.isDefined(identifier):
             self.throwError("Function {} is not defined".format(identifier))
 
-        argumentCount = len(self.children[1].children)
+        argumentCount = 0
+        if len(self.children) != 1:
+            argumentCount = len(self.children[1].children)
         arguments = functionTable.functionTable[identifier][1]
 
         if argumentCount > len(arguments):
             self.throwError("Expected {} arguments, got {}".format(len(arguments), argumentCount))
 
-        if arguments[-1] == '...':
+        if len(arguments) != 0 and arguments[-1] == '...':
             # infinite arguments possible
             if argumentCount < len(arguments) - 1:
                 self.throwError("Expected at least {} arguments, got()".format(len(arguments) - 1, argumentCount))
@@ -1320,7 +1320,7 @@ class FunctionCallNode(ASTNode):
 
         identifier = self.children[0].identifier
         arguments = functionTable.functionTable[identifier][1]
-        if arguments[-1] == '...':
+        if len(arguments) != 0 and arguments[-1] == '...':
             # infinite arguments possible
             for i in range(len(arguments) - 1):  # Don't check the optional arguments
                 self.compatibleArgumentTypes(arguments[i], self.children[1].children[i].type())
@@ -1341,7 +1341,11 @@ class FunctionCallNode(ASTNode):
         argumentTypes = temp[1]
         arguments = []
 
-        for i in range(len(self.children[1].children)):
+        argumentCount = 0
+        if len(self.children) > 1:
+            argumentCount = len(self.children[1].children)
+
+        for i in range(argumentCount):
             child = self.children[1].children[i]
             loc = child.toLLVM(file, funcDef, codeBody)
 
@@ -1367,7 +1371,7 @@ class FunctionCallNode(ASTNode):
         if typeAndAlign[0] == 'i8':
             file.write('signext ')
         file.write(str(typeAndAlign[0]))
-        if argumentTypes[-1] == '...':
+        if len(argumentTypes) > 0 and argumentTypes[-1] == '...':
             file.write(' (i8*, ...)')
         file.write(' @' + str(self.children[0].identifier + '('))
         if len(arguments) == 0:
@@ -1387,7 +1391,7 @@ class FunctionCallNode(ASTNode):
                     type = (llvm.convertArrayToPointer(llvm.getArrayTypeInfo(typeAndAlign[0])))
                     file.write(type)
                 else:
-                    file.write(str(llvm.getLLVMTypeOfVariable(arguments[i], funcDef, codeBody)))
+                    file.write(typeAndAlign[0])
                 if typeAndAlign[0] == 'i8':
                     file.write(' signext')
                 file.write(' ' + str(arguments[i]))
