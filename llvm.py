@@ -195,6 +195,8 @@ def valueTransformer(typename, value):
             return ((int(value) - 128) % 256) - 128
     elif typename == 'float':
         if isinstance(value, int):
+            if value == 0:
+                return '0x0000000000000000'
             return str(float_to_hex(float(value))) + '00000000'
         elif isinstance(value, str):
             if value[0] == '0' and value[-8:len(value)] == '00000000':
@@ -202,6 +204,8 @@ def valueTransformer(typename, value):
             else:
                 return str(float_to_hex(float(ord(value)))) + '00000000'
         elif isinstance(value, float):
+            if value == 0:
+                return '0x0000000000000000'
             return str(float_to_hex(value)) + '00000000'
     else:
         raise Exception('Unknown typename "' + str(typename) + '" given in valueTransformer!')
