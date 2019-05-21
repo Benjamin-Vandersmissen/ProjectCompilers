@@ -1,10 +1,9 @@
 class ExpressionTree:
     def __init__(self, variable, left, right, operator):
-        if variable is not None:
-            self.var = variable
-            self.ershovNumber = None
-            self.register = None
-
+        self.var = variable
+        self.ershovNumber = None
+        self.register = None
+        if left is not None and right is not None:
             self.left = ExpressionTree(left, None, None, None)
             self.right = ExpressionTree(right, None, None, None)
             self.operator = operator
@@ -13,6 +12,8 @@ class ExpressionTree:
             self.right = None
 
     def addNode(self, var, left, right, operator):
+        if self.left is None or self.right is None:
+            return False
         if self.left.var == var:
             self.left = ExpressionTree(var, left, right, operator)
             return True
@@ -45,7 +46,7 @@ class ExpressionTree:
             registerMap = dict()
         if self.left is None or self.right is None:
             return registerMap
-        if self.left.ershov0Number == self.right.ershovNumber:
+        if self.left.ershovNumber == self.right.ershovNumber:
             registerMap = self.right.getRegisters(baseNumber + 1, registerMap)
             self.register = baseNumber + self.ershovNumber
         else:

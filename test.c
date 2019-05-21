@@ -18,7 +18,9 @@ float main(){
 int a = f(1,2,3,4,5);
 int b = 0;
 int c = 0;
-int d = a + b*a +c;
+int d = 0;
+int e = 0;
+int t4 = (a-b)+(e*(c+d));
 int* c = &b;
    return 0;
 }
