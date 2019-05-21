@@ -34,11 +34,15 @@ class ExpressionTree:
                 self.ershovNumber = right
         return self.ershovNumber
 
-    def getRegisters(self, baseNumber):
+    def getRegisters(self, baseNumber, registerMap = None):
+        if registerMap is None:
+            registerMap = dict()
         if self.left.ershovNumber == self.right.ershovNumber:
-            self.right.getRegisters(baseNumber + 1)
+            registerMap = self.right.getRegisters(baseNumber + 1, registerMap)
             self.register = baseNumber + self.ershovNumber
         else:
-            right = self.right.getRegisters(baseNumber)
+            registerMap = self.right.getRegisters(baseNumber, registerMap)
             self.register = baseNumber + self.ershovNumber - 1
-        self.left.getRegisters(baseNumber)
+        self.left.getRegisters(baseNumber, registerMap)
+        registerMap[self.var] = self.register
+        return registerMap
