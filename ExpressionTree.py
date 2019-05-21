@@ -9,7 +9,16 @@ class ExpressionTree:
         self.operator = operator
 
     def addNode(self, var, left, right, operator):
-        pass
+        if self.left.var == var:
+            self.left = ExpressionTree(var, left, right, operator)
+        elif self.right.var == var:
+            self.right = ExpressionTree(var, left, right, operator)
+        elif self.left.addNode(var, left, right, operator):
+            return True
+        elif self.right.addNode(var, left, right, operator):
+            return True
+        else:
+            return False
 
     def getErshovNumber(self):
         if self.left is None or self.right is None:
