@@ -1,12 +1,7 @@
-#include <stdio.h>
-
-int alize = 29;
 
 int main() {
-    while  (alize > 6){
-        char testLocalArray[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, alize};
-        printf(testLocalArray, alize);
-        alize = alize - 1;
-    }
-    return alize;
+    int a = 2;
+    int c = 0;
+    int b = a + a * c / a + 1 - c;
+    return 0;
 }

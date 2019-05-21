@@ -219,13 +219,34 @@ class LLVMTranspiler:
         value = value[:-8]
         return value
 
+    def replaceRegisters(self, startIndex, lines):
+        registerLink = dict()
+        i = startIndex
+        while i < len(lines):
+            line = lines[i]
+            tokens = line.split(' ')
+            if ' = load' in line:
+                registerLink[tokens[0]] = tokens[5][:-1]
+                del lines[i]
+                continue
+            elif '}' == line:
+                return
+            else:
+                for j in range(len(tokens)):
+                    if tokens[j].split(',')[0] in registerLink:
+                        lines[i] = lines[i].replace(tokens[j].split(',')[0], registerLink[tokens[j].split(',')[0]])
+                i += 1
+
     def transpile(self):
         self.createTextFragment()
         self._dataFragment += '.data\n'
 
         lines = self._llvmFile.read().split('\n')
-        for line in lines:
+        i = 0
+        while i < len(lines):
+            line = lines[i]
             if line == '':
+                i += 1
                 continue
             if line[0] == '@':
                 # globale variable assignment
@@ -233,6 +254,7 @@ class LLVMTranspiler:
             if line.find('define') == 0:
                 # function definition
                 self.functionDefinition(line)
+                self.replaceRegisters(i, lines)
 
             if line.find('ret') == 0:
                 self.returnFunction(line)
@@ -241,10 +263,12 @@ class LLVMTranspiler:
             #     self.functionCall(line)
 
             if line[0] == '%':
-                self.operation(lines.index(line), lines)
+                self.operation(i, lines)
 
             if line[0] == '}':
                 self._positiontables.pop()
+
+            i += 1
 
         self._mipsFile.write(self._dataFragment)
         self._mipsFile.write(self._textFragment)
