@@ -1,4 +1,5 @@
 import llvm
+from ExpressionTree import *
 class LLVMTranspiler:
     def __init__(self, filename):
         self._llvmFile = open(filename, "r")
@@ -78,7 +79,7 @@ class LLVMTranspiler:
         #TODO: argumenten opslaan e.d.
 
     def restorePtrs(self):
-        self._textFragment += 'lw $ra, -4($sp) \nmove $sp, $fp \nlw $fp, ($sp)\n'
+        self._textFragment += 'lw $ra, -4($fp) \nmove $sp, $fp \nlw $fp, ($sp)\n'
         self._textFragment += 'jr $ra\n'
 
     def returnFunction(self, line):
@@ -132,6 +133,30 @@ class LLVMTranspiler:
                 break
 
         test = data[1:-1]
+        tree = None
+
+        def extractVars(line):
+            vars = []
+            while line.find('%') != -1:
+                var = line[line.find('%'):].split()[0].split(',')[0]
+                vars.append(var)
+                line = line[1+line.find('%'):]
+            return vars
+
+        for line in reversed(test):
+            vars = extractVars(line)
+            if '= call' in line or '= load' in line:
+                continue
+            if tree is None:
+                tree = ExpressionTree(vars[0], vars[1], vars[2], '')
+            else:
+                if not tree.addNode(vars[0], vars[1], vars[2], ''):
+                    raise Exception("Ge moet hier nie zijn")  # TODO: pas dit zeker niet aan
+
+        if tree is not None:
+            tree.getErshovNumber()
+            register_map = tree.getRegisters(0)
+            i = 0
 
         for line in data:
             if ' = alloca' in line:
@@ -254,7 +279,7 @@ class LLVMTranspiler:
             if line.find('define') == 0:
                 # function definition
                 self.functionDefinition(line)
-                self.replaceRegisters(i, lines)
+                # self.replaceRegisters(i, lines)
 
             if line.find('ret') == 0:
                 self.returnFunction(line)
