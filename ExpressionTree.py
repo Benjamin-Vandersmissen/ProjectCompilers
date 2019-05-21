@@ -35,11 +35,10 @@ class ExpressionTree:
         return self.ershovNumber
 
     def getRegisters(self, baseNumber):
-        self.getErshovNumber()
         if self.left.ershovNumber == self.right.ershovNumber:
-            right = self.right.getRegisters(baseNumber + 1)
-            left = self.left.getRegisters(baseNumber)
+            self.right.getRegisters(baseNumber + 1)
+            self.register = baseNumber + self.ershovNumber
         else:
             right = self.right.getRegisters(baseNumber)
-            left = self.left.getRegisters(baseNumber)
-        self.register = baseNumber
+            self.register = baseNumber + self.ershovNumber - 1
+        self.left.getRegisters(baseNumber)
