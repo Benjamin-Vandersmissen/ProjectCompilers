@@ -18,10 +18,8 @@ class LLVMTranspiler:
             raise Exception("Ge moet hier nie zijn") #TODO: pas dit zeker niet aan
 
     def loadFloatImmediate(self, tempregister, floatregister, hexFloat):
-        firstPart = hexFloat[:-12]
-        secondPart = '0x' + hexFloat[-12:-8]
-        retvalue = 'lui {}, {}\n'.format(tempregister, firstPart)
-        retvalue += 'ori {}, {}, {}\n'.format(tempregister, tempregister, secondPart)
+        float = hexFloat[:-8]
+        retvalue = 'li {}, {}\n'.format(tempregister, float)
         retvalue += 'sw {}, -4($sp)\n'.format(tempregister)
         retvalue += 'lwc1 {}, -4($sp)\n'.format(floatregister)
         return retvalue
@@ -76,12 +74,20 @@ class LLVMTranspiler:
         _, line = self.consumeUntil(line, '@')
         name, line = self.consumeUntil(line, '(')
         self._textFragment += '\n{}:\n'.format(name)
-        #TODO: argumenten ? Stackptr & frameptr opslaan e.d.
+        self._textFragment += 'sw $fp, ($sp) \nmove $fp, $sp \nsubu $sp, $sp, 8 \nsw $ra, -4($fp)\n'
+        #TODO: argumenten opslaan e.d.
+
+    def restorePtrs(self):
+        self._textFragment += 'lw $ra, -4($sp) \nmove $sp, $fp \nlw $fp, ($sp)\n'
+        self._textFragment += 'jr $ra\n'
 
     def returnFunction(self, line):
         _, line = self.consumeUntil(line, 'ret ')
+        if line == 'void':
+            self.restorePtrs()
+            return
         type, line = self.consumeUntil(line, ' ')
-        value, line = self.consumeUntil(line, '\n')
+        value = line
 
         if type == 'float':
             # store return value in f31
@@ -102,29 +108,30 @@ class LLVMTranspiler:
                 self._textFragment += 'li $v0, {}\n'.format(value)
             pass
 
-        # TODO:restore stackptr and frameptr
-        self._textFragment += 'jr $ra\n'
+        self.restorePtrs()
 
     def functionCall(self, line):
 
+        reg, line = self.consumeUntil(line, ' = call ')
+        retType, line = self.consumeUntil(line, ' @')
         identifier, line = self.consumeUntil(line, '(')
         #store arguments & process arguments
         #TODO: alleen de juiste reigsters, als het moet
         self._textFragment += 'jal {}\n'.format(identifier)
 
-    def operation(self, line):
-        data = [line]
-        while True:
-            ptr = self._llvmFile.tell()
-            temp_line = self._llvmFile.readline()
+    def operation(self, index, lines):
+        data = []
+        for i in range(index, len(lines)):
+            temp_line = lines[i]
             if temp_line.find('ret') == -1:
                 data.append(temp_line)
             else:
-                self._llvmFile.seek(ptr)  # revert line
                 break
 
             if temp_line.find('store') == 0:
                 break
+
+        test = data[1:-1]
 
         for line in data:
             if ' = alloca' in line:
@@ -141,6 +148,7 @@ class LLVMTranspiler:
 
             if ' = getelementptr' in line:
                 self.array(line)
+        pass
 
     def allocate(self, line):
         variable, line = self.consumeUntil(line, ' = alloca ')
@@ -214,10 +222,11 @@ class LLVMTranspiler:
     def transpile(self):
         self.createTextFragment()
         self._dataFragment += '.data\n'
-        while True:
-            line = self._llvmFile.readline()
+
+        lines = self._llvmFile.read().split('\n')
+        for line in lines:
             if line == '':
-                break
+                continue
             if line[0] == '@':
                 # globale variable assignment
                 self.globalAssignment(line)
@@ -232,7 +241,7 @@ class LLVMTranspiler:
             #     self.functionCall(line)
 
             if line[0] == '%':
-                self.operation(line)
+                self.operation(lines.index(line), lines)
 
             if line[0] == '}':
                 self._positiontables.pop()
