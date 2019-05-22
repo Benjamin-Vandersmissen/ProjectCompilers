@@ -71,10 +71,6 @@ class FileLookALike():
             return endVar
 
 
-
-
-
-
 # Change the format from a float to a hexadecimal number
 def float_to_hex(f):
     return hex(struct.unpack('<I', struct.pack('<f', f))[0])
@@ -192,7 +188,7 @@ def valueTransformer(typename, value):
         elif isinstance(value, str):
             return ((ord(value) - 128) % 256) - 128
         elif isinstance(value, float):
-            return ((int(value) - 128) % 256) - 128
+            return ((round(value) - 128) % 256) - 128
     elif typename == 'float':
         if isinstance(value, int):
             if value == 0:
@@ -324,13 +320,15 @@ def getValueOfVariable(varName, funcDef, codeBody, file):
         temp = getLLVMOfCVarible(varName, funcDef, codeBody)
         varName = temp[0]
         typeAndAlign = temp[1]
+
+    # If it as an array, it isn't possible
+    if getArrayTypeInfo(typeAndAlign[0]):
+        return varName
+
     # Loading a value from a variable is like taking a depointer so delete one star
     localNumber = funcDef.getLocalNumber(checkTypeAndAlign(typeAndAlign[0][0:-1]))
     # %3 = load i32, i32* <@a/%1>, align 4
     file.write('%' + str(localNumber) + ' = load ' + str(typeAndAlign[0][0:-1]) + ', ' + str(typeAndAlign[0]) + ' ' + str(varName) + ', align ' + str(typeAndAlign[1]) + '\n')
-
-    if getArrayTypeInfo(typeAndAlign[0]):  # TODO: Ik snap de logica hier niet?
-        return varName
 
     return '%' + str(localNumber)
 
@@ -365,13 +363,15 @@ def getLLVMTypeOfVariable(varName, funcDef, codeBody):
 
 
 # Store the value of an llvm variable in a llvm variable representing a C variable and return the llvm variable
-# expects varName to be a C variable or better known as identifier
+# expects varName to be a C variable or better known as identifier (or an local temp llvm register)
 # expects valueVar to be an llvm varibale, better know as %1 or @a
 def writeLLVMStoreForCVariable(varName, valueVar, funcDef, codeBody, file):
     if varName in codeBody.counterTable:  # If the wanted variable is a local variable
         localNumber = codeBody.counterTable[varName]
         typeAndAlign = funcDef.typeAndAlignTable[str(localNumber)]
         varName = '%' + str(localNumber)
+    elif varName[0] == '%':  # If a local temp llvm variable (for array)
+        typeAndAlign = checkTypeAndAlign(getLLVMTypeOfVariable(varName, funcDef, codeBody))
     else:  # If the wanted variable is a global variable
         typeAndAlign = funcDef.parent.typeAndAlignTable[varName]
         varName = '@' + str(varName)
@@ -506,27 +506,18 @@ def getLLVMOperatorAndReturnType(operator, type1, type2):
         else:
             raise Exception('No operation with a pointer and ' + str(type2) + ' exists!')
     else:
-        if type1 == 'i32':
-            type2 = 'i32'
-            returnType = 'i32'
-        elif type1 == 'i8':
+        if type1 == 'float' or type2 == 'float':
+            type1 = 'float'
+            type2 = 'float'
+            returnType = 'float'
+        elif type1 == 'i64' or type2 == 'i64':
+            type1 = 'i64'
+            type2 = 'i64'
+            returnType = 'i64'
+        elif type1 == 'i32' or type2 == 'i32' or type1 == 'i8' or type2 == 'i8' or type1 == 'i1' or type2 == 'i1':
             type1 = 'i32'
             type2 = 'i32'
             returnType = 'i32'
-        elif type1 == 'float':
-            type2 = 'float'
-            returnType = 'float'
-        elif type1 == 'i1':
-            if type2 == 'i1':
-                type1 = 'i32'
-                type2 = 'i32'
-                returnType = 'i32'
-            else:
-                type1 = type2
-                returnType = type2
-        elif type1 == 'i64':
-            type2 = type1
-            returnType = type1
         else:
             raise Exception('Unknown type "' + str(type1) + '" found!')
 
