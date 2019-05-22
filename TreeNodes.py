@@ -1165,7 +1165,6 @@ class AssignmentNode(ASTNode):
             self.printWarning("Incompatible pointer types assigning to {} from {}".format(lhsType, rhsType))
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        # TODO : fix for writing to array element
         if isinstance(self.children[0], ArrayElementNode):
             var = llvm.writeLLVMStoreForCVariable(self.children[0].toLLVM(file, funcDef, codeBody, 'ASSIGN'), self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
         else:
@@ -1386,13 +1385,13 @@ class FunctionCallNode(ASTNode):
             # call void @f2()
             file.write(')\n')
         else:
-            # call void @f2(int %2, int %3)
+            # call void @f2(i32 %2, i32 %3)
             for i in range(len(self.children[1].children)):
-                child = self.children[1].children[i]
-                typeAndAlign = llvm.checkTypeAndAlign(child.type())
+                # child = self.children[1].children[i]
+                typeAndAlign = llvm.checkTypeAndAlign(llvm.getLLVMTypeOfVariable(arguments[i], funcDef, codeBody))
                 if typeAndAlign[0] == 'float' and (self.children[0].identifier == 'printf' or self.children[0].identifier == 'scanf'):
                     #TODO: more hacky code for printf shenanigans
-                    typeAndAlign = ('double', typeAndAlign[1])
+                    typeAndAlign = ('i64', typeAndAlign[1]) # TODO: was double but should be i64 right?
                 if i != 0:
                     file.write(', ')
                 if llvm.getArrayTypeInfo(typeAndAlign[0]):  # convert array to pointer

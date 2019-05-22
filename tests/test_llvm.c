@@ -173,7 +173,7 @@ void alloctest(){
     char testLocalArray[] = {'y', 'o', a, ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
     int* testLocalEmptyArray[2];
     float testLocalArrayToShort[4] = {1, *e1};
-    testGlobalArrayToShort[3] = 10.0036;
+    testGlobalArrayToShort[3] = 10.0036; // write to element of array
 
     a = testLocalArray[0] + testLocalArray[4] * b;
 }
