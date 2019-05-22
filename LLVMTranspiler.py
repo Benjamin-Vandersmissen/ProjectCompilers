@@ -1,5 +1,31 @@
 import llvm
 from ExpressionTree import *
+import copy
+
+
+def extractVars(line):
+    vars = []
+    while line.find('%') != -1:
+        var = line[line.find('%'):].split()[0].split(',')[0]
+        vars.append(var)
+        line = line[1 + line.find('%'):]
+    return vars
+
+
+def tokenise(line):
+    tokens = line.split()
+    temp = []
+    for i in range(len(copy.copy(tokens))):
+        token = tokens[i]
+        token = token.split(',')[0]
+        token = token.split(')')[0]
+        if '(' in token:
+            temp += token.split('(')
+        else:
+            temp.append(token)
+    return temp
+
+
 class LLVMTranspiler:
     def __init__(self, filename):
         self._llvmFile = open(filename, "r")
@@ -31,35 +57,28 @@ class LLVMTranspiler:
         self._textFragment += 'li $v0 10\n'  # Exit the program responsibly
         self._textFragment += 'syscall\n'
 
-    def globalAssignment(self, line):
-        global_variable, line = self.consumeUntil(line, ' = ')
-        _, line = self.consumeUntil(line, 'global ')
-        global_variable = self.getGlobalName(global_variable)
+    def globalAssignment(self, tokens):
+        global_variable = self.getGlobalName(tokens[0])
+        type = tokens[3]
 
-        if line[0] == '[':  # Array type
-
-            type, line = self.consumeUntil(line[1:], '] ')
-
-            if 'float' in type:
+        if type[0] == '[':  # Array type
+            if 'float' in tokens[5]:
                 type = '.float'
-
             else:
                 type = '.word'
-
-            value, line = self.consumeUntil(line[1:], ']')
-            print(type, value)
-            value = value.split(', ')
-            value = [v.split()[1] for v in value]
             self._dataFragment += '{}: {} '.format(global_variable, type)
-            for v in value:
-                if v != value[-1]:
-                    self._dataFragment += '{}, '.format(v)
-                else:
-                    self._dataFragment += '{}\n'.format(v)
+            for i in range(7, len(tokens)-2, 2):
+                value = tokens[i].split(']')[0]
+                if type == '.float':
+                    value - llvm.hex_to_float(value)
+
+                if i > 7:
+                    self._dataFragment += ', '
+                self._dataFragment += '{}'.format(value)
+            self._dataFragment += '\n'
             return
 
-        type, line = self.consumeUntil(line, ' ')
-        value, line = self.consumeUntil(line, ', ')
+        value = tokens[4]
         if type == 'float':
             type = '.float'
             value = llvm.hex_to_float(value)
@@ -68,12 +87,10 @@ class LLVMTranspiler:
         self._dataFragment += '{}: {} {}\n'.format(global_variable, type, value)
 
 
-    def functionDefinition(self, line):
+    def functionDefinition(self, tokens):
 
         self._positiontables.append([])
-
-        _, line = self.consumeUntil(line, '@')
-        name, line = self.consumeUntil(line, '(')
+        name = tokens[2][1:]
         self._textFragment += '\n{}:\n'.format(name)
         self._textFragment += 'sw $fp, ($sp) \nmove $fp, $sp \nsubu $sp, $sp, 8 \nsw $ra, -4($fp)\n'
         #TODO: argumenten opslaan e.d.
@@ -82,13 +99,13 @@ class LLVMTranspiler:
         self._textFragment += 'lw $ra, -4($fp) \nmove $sp, $fp \nlw $fp, ($sp)\n'
         self._textFragment += 'jr $ra\n'
 
-    def returnFunction(self, line):
-        _, line = self.consumeUntil(line, 'ret ')
-        if line == 'void':
+    def returnFunction(self, tokens):
+        type = tokens[1]
+        if type == 'void':
             self.restorePtrs()
             return
-        type, line = self.consumeUntil(line, ' ')
-        value = line
+
+        value = tokens[2]
 
         if type == 'float':
             # store return value in f31
@@ -113,12 +130,13 @@ class LLVMTranspiler:
 
     def functionCall(self, line):
 
-        reg, line = self.consumeUntil(line, ' = call ')
-        retType, line = self.consumeUntil(line, ' @')
-        identifier, line = self.consumeUntil(line, '(')
-        #store arguments & process arguments
-        #TODO: alleen de juiste reigsters, als het moet
-        self._textFragment += 'jal {}\n'.format(identifier)
+        pass
+        # reg, line = self.consumeUntil(line, ' = call ')
+        # retType, line = self.consumeUntil(line, ' @')
+        # identifier, line = self.consumeUntil(line, '(')
+        # #store arguments & process arguments
+        # #TODO: alleen de juiste reigsters, als het moet
+        # self._textFragment += 'jal {}\n'.format(identifier)
 
     def operation(self, index, lines):
         data = []
@@ -127,53 +145,68 @@ class LLVMTranspiler:
             if temp_line.find('ret') == -1:
                 data.append(temp_line)
             else:
+                index = i-1
                 break
 
             if temp_line.find('store') == 0:
+                index = i
                 break
 
-        test = data[1:-1]
         tree = None
 
-        def extractVars(line):
-            vars = []
-            while line.find('%') != -1:
-                var = line[line.find('%'):].split()[0].split(',')[0]
-                vars.append(var)
-                line = line[1+line.find('%'):]
-            return vars
-
-        for line in reversed(test):
-            vars = extractVars(line)
-            if '= call' in line or '= load' in line:
+        for line in reversed(data[1:-1]):
+            tokens = tokenise(line)
+            vars = [token for token in tokens if token[0] == '%']
+            if len(vars) < 3:
+                # bouw expression tree alleen op met expressions die 2 variables gebruiken en opslaan in een derde
                 continue
             if tree is None:
-                tree = ExpressionTree(vars[0], vars[1], vars[2], '')
+                tree = ExpressionTree(vars[0], vars[1], vars[2], tokens[2])
             else:
-                if not tree.addNode(vars[0], vars[1], vars[2], ''):
+                if not tree.addNode(vars[0], vars[1], vars[2], tokens[2]):
                     raise Exception("Ge moet hier nie zijn")  # TODO: pas dit zeker niet aan
 
+        register_map = dict()
+        new_operations = []
         if tree is not None:
             tree.getErshovNumber()
-            register_map = tree.getRegisters(0)
-            i = 0
+            register_map, new_operations = tree.getRegisters(0)
 
         for line in data:
-            if ' = alloca' in line:
-                self.allocate(line)
+            tokens = tokenise(line)
+            vars = [token for token in tokens if token[0] == '%']
+            if len(register_map) == 0:
+                if tokens[2] == 'alloca':
+                    self.allocate(line)
 
-            if ' = load' in line:
-                self.load(line)
+                if tokens[2] == 'load':
+                    self.load(tokens, '$t0')
 
-            if line.find('store') == 0:
-                self.store(line)
+                if tokens[0] == 'store':
+                    self.store(tokens, '$t0')
 
-            if ' = call' in line:
-                self.functionCall(line)
+                if tokens[2] == 'call':
+                    self.functionCall(line)
 
-            if ' = getelementptr' in line:
-                self.array(line)
-        pass
+                if tokens[2] == 'getelementptr':
+                    self.array(line)
+            else:
+                if tokens[2] == 'alloca':
+                    self.allocate(line)
+
+                if tokens[2] == 'load':
+                    self.load(tokens, '$t0')
+
+                if tokens[0] == 'store':
+                    self.store(tokens, '$t0')
+
+                if tokens[2] == 'call':
+                    self.functionCall(line)
+
+                if tokens[2] == 'getelementptr':
+                    self.array(line)
+
+        return index
 
     def allocate(self, line):
         variable, line = self.consumeUntil(line, ' = alloca ')
@@ -187,48 +220,43 @@ class LLVMTranspiler:
             self._positiontables[-1].append(variable)
             self._textFragment += 'subu $sp, $sp, 4\n'
 
-    def load(self, line):
-        variable, line = self.consumeUntil(line, ' = load')
-        type, line = self.consumeUntil(line, ',')
-        _, line = self.consumeUntil(line, type+'* ')
-        value, line = self.consumeUntil(line, ',')
+    def load(self, tokens, register):
+        type = tokens[2]
+        value = tokens[5]
 
         if type == 'float':
-            if '@' in value:  # global variable
+            if value[0] == '@':  # global variable
                 value = self.getGlobalName(value)
                 self._textFragment += 'lwc1 $f0, {}\n'.format(value)
-            elif '%' in value:  # local variable
+            elif value[0] == '%':  # local variable
                 offset = 4*(len(self._positiontables[-1]) - self._positiontables[-1].index(value))
                 self._textFragment += 'lwc1 $f0, {}($sp)\n'.format(offset)
         else:
-            if '@' in value:  # global variable
+            if value[0] == '@':  # global variable
                 value = self.getGlobalName(value)
-                self._textFragment += 'lw $t0, {}\n'.format(value)
-            elif '%' in value:  # local variable
+                self._textFragment += 'lw {}, {}\n'.format(register, value)
+            elif value[0] == '%':  # local variable
                 offset = 4*(len(self._positiontables[-1]) - self._positiontables[-1].index(value))
-                self._textFragment += 'lw $t0, {}($sp)\n'.format(offset)
+                self._textFragment += 'lw {}, {}($sp)\n'.format(register, offset)
 
-
-    def store(self, line):
-        type, line = self.consumeUntil(line[6:], ' ')
-        value, line = self.consumeUntil(line, ', ')
-        _, line = self.consumeUntil(line, '* ')
-        target, line = self.consumeUntil(line, ', ')
+    def store(self, tokens, register):
+        a = 0
+        type = tokens[1]
+        value = tokens[2]
+        target = tokens[4]
         offset = 4 * (len(self._positiontables[-1]) - self._positiontables[-1].index(target))
         if type == 'float':
             if '%' not in value:  # load float in normal register
-                firstPart = value[:-12]
-                secondPart = '0x' + value[-12:-8]
-                self._textFragment += 'lui $t0, {}\n'.format(firstPart)
-                self._textFragment += 'ori $t0, $t0, {}\n'.format(secondPart)
-                self._textFragment += 'sw $t0, {}($sp)\n\n'.format(offset)
+                float = value[:-18]
+                self._textFragment += 'li {}, {}\n'.format(register, float)
+                self._textFragment += 'sw {}, {}($sp)\n\n'.format(register, offset)
             else:
-                self._textFragment += 'lwc1 %f0, {}($sp)\n\n'.format(offset)
+                self._textFragment += 'lwc1 $f0, {}($sp)\n\n'.format(offset)
 
         else:
             if '%' not in value:
-                self._textFragment += 'li $t0, {}\n'.format(value)
-            self._textFragment += 'sw $t0, {}($sp)\n\n'.format(offset)
+                self._textFragment += 'li {}, {}\n'.format(register, value)
+            self._textFragment += 'sw {}, {}($sp)\n\n'.format(register, offset)
 
     def array(self, line):
         variable, line = self.consumeUntil(line, ' = getelementptr inbounds')
@@ -270,25 +298,26 @@ class LLVMTranspiler:
         i = 0
         while i < len(lines):
             line = lines[i]
-            if line == '':
+            tokens = tokenise(line)
+            if len(tokens) == 0:
                 i += 1
                 continue
-            if line[0] == '@':
+            if tokens[0][0] == '@':
                 # globale variable assignment
-                self.globalAssignment(line)
-            if line.find('define') == 0:
+                self.globalAssignment(tokens)
+            if tokens[0] == 'define':
                 # function definition
-                self.functionDefinition(line)
+                self.functionDefinition(tokens)
                 # self.replaceRegisters(i, lines)
 
-            if line.find('ret') == 0:
-                self.returnFunction(line)
+            if tokens[0] == 'ret':
+                self.returnFunction(tokens)
 
             # if 'call' in line:  # TODO: handle calls much better
             #     self.functionCall(line)
 
-            if line[0] == '%':
-                self.operation(i, lines)
+            if tokens[0][0] == '%':
+                i = self.operation(i, lines)
 
             if line[0] == '}':
                 self._positiontables.pop()

@@ -16,11 +16,10 @@ void g(){
 
 float main(){
 int a = f(1,2,3,4,5);
-int b = 0;
-int c = 0;
-int d = 0;
-int e = 0;
-int t4 = (a-b)+(e*(c+d));
-int* c = &b;
-   return 0;
+int b = 1;
+int c = 2;
+int d = 3;
+int e = 4;
+int t4 = (a-b)+(e*(c+d))+1;
+return 0;
 }
