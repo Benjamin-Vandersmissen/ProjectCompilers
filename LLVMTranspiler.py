@@ -42,7 +42,7 @@ class LLVMTranspiler:
         if variable[0] == '@':
             return '_' + variable[1:]
         else:
-            raise Exception("Ge moet hier nie zijn") #TODO: pas dit zeker niet aan
+            raise Exception("Ge moet hier nie zijn") # pas dit zeker niet aan!!
 
     def loadFloatImmediate(self, tempregister, floatregister, hexFloat):
         float = hexFloat[:-8]
@@ -164,7 +164,7 @@ class LLVMTranspiler:
                 tree = ExpressionTree(vars[0], vars[1], vars[2], tokens[2])
             else:
                 if not tree.addNode(vars[0], vars[1], vars[2], tokens[2]):
-                    raise Exception("Ge moet hier nie zijn")  # TODO: pas dit zeker niet aan
+                    raise Exception("Ge moet hier nie zijn")  # pas dit zeker niet aan!!!
 
         register_map = dict()
         new_operations = []

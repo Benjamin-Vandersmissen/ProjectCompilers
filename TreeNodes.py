@@ -1096,7 +1096,7 @@ class ReturnTypeNode(TypeNameNode):
     pass
 
 
-class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
+class ArrayElementNode(ASTNode):
     def type(self):
         identifier = self.children[0].identifier
         type = symbolTables[-1].getEntry(identifier)
