@@ -993,7 +993,7 @@ class FunctionDeclarationNode(ASTNode):
         if functionTable.exists(identifier) and not functionTable.signatureExists(typename, identifier, arguments):
             self.throwError("function {} is redeclared with a different signature".format(identifier))
 
-        functionTable.addFunction(typename, identifier, arguments, False)
+        functionTable.addFunction(typename, identifier, arguments, isinstance(self.parent, FunctionDefinitionNode))
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         typeAndAlign = llvm.checkTypeAndAlign(self.children[0].typename)
@@ -1079,10 +1079,7 @@ class FunctionDefinitionNode(ASTNode):
             symbolTables[-1].addSymbol(typename, identifier)
 
     def endDFS(self):
-        # symbol table is finished, pop from stack, set the defined flag to true for this function
-        identifier = self.children[0].children[1].identifier
-        entry = functionTable.functionTable[identifier]
-        functionTable.functionTable[identifier] = (entry[0], entry[1], True)
+        # symbol table is finished, pop from stack
         self.symbolTable = symbolTables.pop()
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
@@ -1303,15 +1300,12 @@ class FunctionCallNode(ASTNode):
             argumentCount = len(self.children[1].children)
         arguments = functionTable.functionTable[identifier][1]
 
-        if argumentCount > len(arguments):
-            self.throwError("Expected {} arguments, got {}".format(len(arguments), argumentCount))
-
         if len(arguments) != 0 and arguments[-1] == '...':
             # infinite arguments possible
             if argumentCount < len(arguments) - 1:
                 self.throwError("Expected at least {} arguments, got()".format(len(arguments) - 1, argumentCount))
         else:
-            if argumentCount < len(arguments):
+            if argumentCount != len(arguments):
                 self.throwError("Expected {} arguments, got {}".format(len(arguments), argumentCount))
 
 
