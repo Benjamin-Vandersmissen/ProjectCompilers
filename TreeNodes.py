@@ -1093,7 +1093,7 @@ class ReturnTypeNode(TypeNameNode):
     pass
 
 
-class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
+class ArrayElementNode(ASTNode):
     def type(self):
         identifier = self.children[0].identifier
         type = symbolTables[-1].getEntry(identifier)
@@ -1107,7 +1107,12 @@ class ArrayElementNode(ASTNode):  # TODO: llvm TESTEN
         localNumber = funcDef.getLocalNumber(llvm.checkTypeAndAlign(llvmReturnType))
         # %2 = getelementptr inbounds [13 x i32], [13 x i32]* %1, i64 0, i64 1
         file.write('%' + str(localNumber) + ' = getelementptr inbounds ' + str(typeAndAlign[0][0:-1]) + ', ' + str(typeAndAlign[0]) + ' ' + str(varName) + ', i64 0, i64 ' + str(self.children[1].value) + '\n')
-        varName = llvm.getValueOfVariable('%' + str(localNumber), funcDef, codeBody, file)
+        varName = '%' + str(localNumber)
+
+        if returnType != 'ASSIGN':
+            varName = llvm.getValueOfVariable(varName, funcDef, codeBody, file)
+        else:
+            returnType = None
 
         if returnType is None:
             return varName
@@ -1157,8 +1162,10 @@ class AssignmentNode(ASTNode):
             self.printWarning("Incompatible pointer types assigning to {} from {}".format(lhsType, rhsType))
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        # TODO : fix for writing to array element
-        var = llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
+        if isinstance(self.children[0], ArrayElementNode):
+            var = llvm.writeLLVMStoreForCVariable(self.children[0].toLLVM(file, funcDef, codeBody, 'ASSIGN'), self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
+        else:
+            var = llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
         if returnType is not None:
             return llvm.changeLLVMType(returnType, llvm.getValueOfVariable(var, funcDef, codeBody, file), funcDef, file)
 
@@ -1372,13 +1379,13 @@ class FunctionCallNode(ASTNode):
             # call void @f2()
             file.write(')\n')
         else:
-            # call void @f2(int %2, int %3)
+            # call void @f2(i32 %2, i32 %3)
             for i in range(len(self.children[1].children)):
-                child = self.children[1].children[i]
-                typeAndAlign = llvm.checkTypeAndAlign(child.type())
+                # child = self.children[1].children[i]
+                typeAndAlign = llvm.checkTypeAndAlign(llvm.getLLVMTypeOfVariable(arguments[i], funcDef, codeBody))
                 if typeAndAlign[0] == 'float' and (self.children[0].identifier == 'printf' or self.children[0].identifier == 'scanf'):
                     #TODO: more hacky code for printf shenanigans
-                    typeAndAlign = ('double', typeAndAlign[1])
+                    typeAndAlign = ('i64', typeAndAlign[1]) # TODO: was double but should be i64 right?
                 if i != 0:
                     file.write(', ')
                 if llvm.getArrayTypeInfo(typeAndAlign[0]):  # convert array to pointer
