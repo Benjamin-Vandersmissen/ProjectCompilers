@@ -121,14 +121,6 @@ jr $ra
 '''
 
 
-def extractVars(tokens):
-    vars = []
-    for token in tokens:
-        if token[0] == '%':
-            vars.append(token)
-    return vars
-
-
 def tokenise(line):
     tokens = line.split()
     temp = []
@@ -144,29 +136,40 @@ def tokenise(line):
     return temp
 
 
+# convention :  $f0->$f9 = temp float registers, $f20-$f29 = saved float registers
+#               $v1 = temporary register voor int bewerkingen, bijv int direct naar stack schrijven
+#               $f31 = temporary register voor float bewerkingen, bijv. float naar int converten
 class Stack:
     def __init__(self):
         self._stack = []
         self._pointers = dict()
         self.temporaries = dict()
-        self._variables = dict()
+        self.variables = dict()
+        self.f_temporaries = dict()
+        self.f_variables = dict()
         # Aantal argumenten in deze scope,
         # stel dat er registers gerefereerd worden die nooit gestored zijn, dan kunnen dit argumenten zijn
         self._arguments = 0
 
-
     def allocate(self, variable):
-        self._variables[variable] = '$s{}'.format(len(self._variables))
+        self.variables[variable] = '$s{}'.format(len(self.variables))
 
-    def allocateArray(self, variable, size):
+    def allocate_float(self, variable):
+        self.f_variables[variable] = '$f{}'.format(20 + len(self.f_variables))
+
+    def allocate_array(self, variable, size):
         for i in range(int(size)):
             self._stack.append(variable)
 
-    def allocateTemp(self, variable):
+    def allocate_temp(self, variable):
         self.temporaries[variable] = '$t{}'.format(len(set(self.temporaries.values())))
 
-    def clearTemporaries(self):
+    def allocate_float_temp(self, variable):
+        self.f_temporaries[variable] = '$f{}'.format(len(set(self.f_temporaries.values())))
+
+    def clear_temporaries(self):
         self.temporaries = {}
+        self.f_temporaries = {}
 
     def position(self, variable):
         if variable[0] == '@':  # global variable
@@ -175,8 +178,14 @@ class Stack:
         if variable in self.temporaries:
             return self.temporaries[variable]
 
-        elif variable in self._variables:
-            return self._variables[variable]
+        elif variable in self.f_temporaries:
+            return self.f_temporaries[variable]
+
+        elif variable in self.variables:
+            return self.variables[variable]
+
+        elif variable in self.f_variables:
+            return self.f_variables[variable]
 
         elif variable in self._stack:
             return '{}($sp)'.format(4 * (1 + self._stack.index(variable)))
@@ -191,12 +200,6 @@ class Stack:
             offset = (self._arguments - int(variable[1:])) * 4
             return '{}($fp)'.format(offset)
 
-    def push(self, register):
-        self._stack.append(register)
-
-    def pop(self, register):
-        self._stack.pop()
-
     def add_pointer(self, pointer, pointee, offset=0):
         offset = int(offset)
         while pointee not in self._stack:
@@ -204,39 +207,51 @@ class Stack:
             offset += increase
         self._pointers[pointer] = pointee, offset
 
-    def offset(self, register):
-        offset = 0
-        if register in self._pointers:
-            register, offset = self._pointers[register]
-        list = [i for i, n in enumerate(self._stack) if n == register]
-        if len(list) <= offset:
-            return -1
-        return 4 * (len(self._stack) - list[offset])
-
-    def storeVariables(self):
+    def store_registers(self):
         retvalue = ""
         i = 0
+        for temp in set(self.f_temporaries.values()):
+            retvalue += "swc1 {}, -{}($sp)\n".format(temp, i)
+            i += 4
+        for var in set(self.f_variables.values()):
+            retvalue += "swc1 {}, -{}($sp)\n".format(var, i)
+            i += 4
         for temp in set(self.temporaries.values()):
             retvalue += "sw {}, -{}($sp)\n".format(temp, i)
             i += 4
-        for var in set(self._variables.values()):
+        for var in set(self.variables.values()):
             retvalue += "sw {}, -{}($sp)\n".format(var, i)
             i += 4
         retvalue += "subu $sp, $sp, {}\n\n".format(i)
         return retvalue
 
-    def loadVariables(self):
+    def load_registers(self):
         retValue = ""
         i = 0
-        for var in reversed(list(set(self._variables.values()))):
+        for var in reversed(list(set(self.variables.values()))):
             i += 4
             retValue += "lw {}, {}($sp)\n".format(var, i)
 
         for temp in reversed(list(set(self.temporaries.values()))):
             i += 4
             retValue += "lw {}, {}($sp)\n".format(temp, i)
+
+        for var in reversed(list(set(self.f_variables.values()))):
+            i += 4
+            retValue += "lwc1 {}, {}($sp)\n".format(var, i)
+
+        for temp in reversed(list(set(self.f_temporaries.values()))):
+            i += 4
+            retValue += "lwc1 {}, {}($sp)\n".format(temp, i)
+
         retValue += "addu $sp, $sp, {}\n\n".format(i)
         return retValue
+
+    def assign_same_temporary(self, newRegister, oldRegister):
+        if oldRegister in self.temporaries:
+            self.temporaries[newRegister] = self.temporaries[oldRegister]
+        if oldRegister in self.f_temporaries:
+            self.f_temporaries[newRegister] = self.f_temporaries[oldRegister]
 
 
 class LLVMTranspiler:
@@ -248,21 +263,16 @@ class LLVMTranspiler:
         self._positiontables = []
         self._IOdefined = False
 
-    def consumeUntil(self, line, tokens):
-        retvalue, line = line.split(tokens, 1)
-        return retvalue, line
-
     def getGlobalName(self, variable):
         if variable[0] == '@':
             return '_' + variable[1:]
         else:
-            raise Exception("Ge moet hier nie zijn")  # TODO: pas dit zeker niet aan
+            raise Exception("Ge moet hier nie zijn")  # pas dit zeker niet aan
 
-    def loadFloatImmediate(self, tempregister, floatregister, hexFloat):
+    def loadFloatImmediate(self, floatregister, hexFloat):
         float = hexFloat[:-8]
-        retvalue = 'li {}, {}\n'.format(tempregister, float)
-        retvalue += 'sw {}, -4($sp)\n'.format(tempregister)
-        retvalue += 'lwc1 {}, -4($sp)\n'.format(floatregister)
+        retvalue = 'li $v1, {}\n'.format(float)
+        retvalue += 'mtc1 $v1, {}\n\n'.format(floatregister)
         return retvalue
 
     def createTextFragment(self):
@@ -315,7 +325,6 @@ class LLVMTranspiler:
         self._textFragment += 'lw $ra, -4($fp) \nmove $sp, $fp \nlw $fp, ($sp)\n'
         self._textFragment += 'jr $ra\n'
 
-
     def convertTo32bitFloat(self, value):
         # value is in string representation
         value = value[:-8]
@@ -324,9 +333,10 @@ class LLVMTranspiler:
     def allocate(self, tokens):
         register = tokens[0]
         if '[' in tokens[3]:  # array
-            # TODO: float ?
-            self._positiontables[-1].allocateArray(register, tokens[3][1:])
-            self._textFragment += 'subu $sp, $sp, {}\n'.format(4 * int(tokens[3][1:]))
+            self._positiontables[-1].allocate_array(register, tokens[3][1:])
+            self._textFragment += 'subu $sp, $sp, {}\n\n'.format(4 * int(tokens[3][1:]))
+        elif tokens[3] == 'float':
+            self._positiontables[-1].allocate_float(register)
         else:
             self._positiontables[-1].allocate(register)
 
@@ -337,19 +347,26 @@ class LLVMTranspiler:
         if '%' in value:
             from_register = self._positiontables[-1].position(value)
             if '$fp' in from_register:
-                self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
+                if tokens[1] == 'float':
+                    self._textFragment += 'lwc1 {}, {}\n'.format(to_register, from_register)
+                else:
+                    self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
+            elif '$f' in from_register:
+                self._textFragment += 'mov.s {}, {}\n'.format(to_register, from_register)
             else:
                 self._textFragment += 'move {}, {}\n'.format(to_register, from_register)
         else:
-            # TODO: float
             if '$sp' in to_register:
                 # use v1 for temporary immediate loading
                 self._textFragment += 'li $v1, {}\n'.format(value)
-                self._textFragment += 'sw $v1, {}\n'.format(to_register)
+                self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
             else:
-                self._textFragment += 'li {}, {}\n'.format(to_register, value)
+                if tokens[1] == 'float':
+                    self._textFragment += self.loadFloatImmediate(to_register, value)
+                else:
+                    self._textFragment += 'li {}, {}\n\n'.format(to_register, value)
 
-        self._positiontables[-1].clearTemporaries()
+        self._positiontables[-1].clear_temporaries()
 
     def makePointer(self, tokens):
         variables = [token for token in tokens if token[0] == '%']
@@ -368,7 +385,10 @@ class LLVMTranspiler:
             var = self.getGlobalName(tokens[2])
             self._textFragment += 'lw $v0, {}\n'.format(var)
         else:
-            self._textFragment += 'li $v0, {}\n'.format(tokens[2])
+            value = tokens[2]
+            if '0x' in value:
+                value = value[:-8]
+            self._textFragment += 'li $v0, {}\n'.format(value)
 
         self.restorePtrs()
 
@@ -385,21 +405,24 @@ class LLVMTranspiler:
             identifier = identifier[1:]
 
         elif identifier == '@scanf' and self._IOdefined:
-            pass
+            pass  # TODO: implementeer
 
         else:
             for j in range(tokens.index(identifier) + 2, len(tokens), 2):
                 parameters.append(tokens[j])
             identifier = '_' + identifier[1:]
 
-        self._textFragment += self._positiontables[-1].storeVariables()
+        self._textFragment += self._positiontables[-1].store_registers()
 
         for j in range(len(parameters)):  # store parameters on stack
             stack_offset = -4 * j
             parameter = parameters[j]
             if parameter[0] == '%':
                 from_register = self._positiontables[-1].position(parameter)
-                self._textFragment += 'sw {}, {}($sp)\n'.format(from_register, stack_offset)
+                if '$f' in from_register:
+                    self._textFragment += 'swc1 {}, {}($sp)\n'.format(from_register, stack_offset)
+                else:
+                    self._textFragment += 'sw {}, {}($sp)\n'.format(from_register, stack_offset)
             elif parameter[0] == '@':  # TODO
                 pass
             else:
@@ -410,28 +433,57 @@ class LLVMTranspiler:
         self._textFragment += 'jal {}\n'.format(identifier)
         self._textFragment += 'addu $sp, $sp, {}\n'.format(4 * len(parameters))
 
-        self._textFragment += self._positiontables[-1].loadVariables()
+        self._textFragment += self._positiontables[-1].load_registers()
 
         if tokens[0] != 'call':  # save return value
+            if self._positiontables[-1].position(tokens[0]) is None:
+                if tokens[3] == 'float':
+                    self._positiontables[-1].allocate_float_temp(tokens[0])
+                else:
+                    self._positiontables[-1].allocate_temp(tokens[0])
             to_register = self._positiontables[-1].position(tokens[0])
-            self._textFragment += 'move {}, $v0\n\n'.format(to_register)
+            if '$f' in to_register:
+                self._textFragment += 'mtc1 $v0, {}\n\n'.format(to_register)
+            else:
+                self._textFragment += 'move {}, $v0\n\n'.format(to_register)
 
     def operation(self, tokens):
         to_register = self._positiontables[-1].position(tokens[0])
         operator = tokens[2]
-        value = tokens[5]
-        if value[0] == '%':
-            from_register = self._positiontables[-1].position(tokens[4])
-            self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register,
-                                                           from_register)
-        elif value[0] == '@':
-            var = self.getGlobalName(value)
+        lhs = tokens[4]
+        rhs = tokens[5]
+        if rhs[0] == '%':
+            rhs = self._positiontables[-1].position(rhs)
+            lhs = self._positiontables[-1].position(lhs)
+            self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, lhs, rhs)
+        elif rhs[0] == '@':
+            var = self.getGlobalName(rhs)
             self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register, var)
 
         else:  # use immediate
             operator += 'i'
-            self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register, value)
+            self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register, rhs)
 
+    def float_operation(self, tokens):
+        to_register = self._positiontables[-1].position(tokens[0])
+        operator = tokens[2][1:] + '.s'
+        lhs = tokens[4]
+        rhs = tokens[5]
+        if rhs[0] == '%':
+            rhs = self._positiontables[-1].position(rhs)
+            lhs = self._positiontables[-1].position(lhs)
+            self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, lhs, rhs)
+        elif rhs[0] == '@':
+            #TODO : is this correct?
+            var = self.getGlobalName(rhs)
+            self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register, var)
+
+        else:  # use immediate
+            if self._positiontables[-1].position(tokens[0]) is None:
+                self._positiontables[-1].assign_same_temporary(tokens[0], tokens[4])
+            to_register = self._positiontables[-1].position(tokens[0])
+            self._textFragment += self.loadFloatImmediate('$f31', rhs)
+            self._textFragment += '{} {}, {}, $f31\n\n'.format(operator, to_register, to_register)
 
     # Returns the index of the first line not belonging to this scope
     def processScope(self, lines, index):
@@ -447,7 +499,7 @@ class LLVMTranspiler:
         i = -1
         while i < len(data) - 1:
             i += 1
-            # TODO: overal speciale gevallen met globale variabelen/floats implementeren
+            # TODO: overal speciale gevallen met globale variabelen implementeren
 
             tokens = data[i]
             variables = [token for token in tokens if token[0] == '%']
@@ -488,6 +540,7 @@ class LLVMTranspiler:
                 # catch all voor operaties die returnwaarde teruggeven en met up to date registers moeten werken
 
                 # Allocate temporary for variable
+                use_floats = -1
                 if self._positiontables[-1].position(variables[0]) is None:
                     # variable heeft nog geen register ==> maak expression tree
                     expressions = []  # expressions voor in expression tree
@@ -496,6 +549,10 @@ class LLVMTranspiler:
                         if 'store' in data[j] or 'ret' in data[j] or 'br' in data[j]:  # expressie is hier volledig
                             break
                         elif len(temp_vars) == 3 and 'call' not in data[j]:
+                            if tokens[3] == 'float' and use_floats == -1:
+                                use_floats = 1
+                            elif use_floats == -1:
+                                use_floats = 0
                             expressions.append(data[j])
 
                     if len(expressions) > 0:
@@ -505,21 +562,25 @@ class LLVMTranspiler:
                             temp_tokens = expressions[-k]
                             temp_vars = [token for token in temp_tokens if token[0] == '%']
                             if tree is None:
-                                tree = ExpressionTree(temp_vars[0], temp_vars[1], temp_vars[2], temp_tokens)
+                                tree = ExpressionTree(temp_vars[0], temp_vars[1], temp_vars[2], temp_tokens, use_floats)
                             else:
                                 if not tree.addNode(temp_vars[0], temp_vars[1], temp_vars[2], temp_tokens):
-                                    raise Exception("Ge moet hier nie zijn")  # TODO: pas dit zeker niet aan
+                                    raise Exception("Ge moet hier nie zijn")  # pas dit zeker niet aan
 
-                        register_map = dict()
-                        new_operations = []
                         if tree is not None:
                             tree.getErshovNumber()
-                            basenumber = len(set(self._positiontables[-1].temporaries.values()))
+                            if use_floats:
+                                basenumber = len(set(self._positiontables[-1].f_temporaries.values()))
+                            else:
+                                basenumber = len(set(self._positiontables[-1].temporaries.values()))
                             register_map, new_operations = tree.getRegisters(basenumber)
 
                             if variables[0] in register_map:
                                 # update temporaries alleen als het effect heeft op deze statement
-                                self._positiontables[-1].temporaries.update(register_map)
+                                if use_floats:
+                                    self._positiontables[-1].f_temporaries.update(register_map)
+                                else:
+                                    self._positiontables[-1].temporaries.update(register_map)
 
                                 # re-order operations
                                 leftPart = data[:i]
@@ -529,42 +590,40 @@ class LLVMTranspiler:
                                 # insert unused expressions before the first used expression behind it
                                 for expression in unused_expressions:
                                     index = data[i:j].index(expression)
-                                    for k in range(index + 1, j):
-                                        if data[i + k] in expressions:
-                                            index = leftPart.index(data[i + k])
+                                    for k in range(i + index + 1, len(data)):
+                                        if data[k] in expressions:
+                                            index = leftPart.index(data[k])
                                             leftPart = leftPart[:index] + [expression] + leftPart[index:]
                                             break
+                                    else:
+                                        rightPart = [expression] + rightPart
 
                                 data = leftPart + rightPart
-                                i = data.index(tokens) - 1
+                                i -= 1
                                 continue
-                            else:
-                                if len(variables) > 1 and 'call' not in tokens and 'load' not in tokens:
-                                    # assign same temporary as other argument (for operations using an immediates)
-                                    self._positiontables[-1].temporaries[variables[0]] = \
-                                        self._positiontables[-1].temporaries[
-                                            variables[1]]
-                                else:
-                                    self._positiontables[-1].allocateTemp(variables[0])
-                    else:
-                        if len(variables) > 1 and 'call' not in tokens and 'load' not in tokens:
-                            # assign same temporary as other argument (for operations using an immediates)
-                            self._positiontables[-1].temporaries[variables[0]] = self._positiontables[-1].temporaries[
-                                variables[1]]
-                        else:
-                            self._positiontables[-1].allocateTemp(variables[0])
 
                 if tokens[2] == 'add' or tokens[2] == 'sub' or tokens[2] == 'mul' or tokens[2] == 'div':
                     self.operation(tokens)
+
+                elif tokens[2] == 'fadd' or tokens[2] == 'fsub' or tokens[2] == 'fmul' or tokens[2] == 'fdiv':
+                    self.float_operation(tokens)
 
                 elif tokens[2] == 'load':
                     if tokens[3][0] != '[':
                         # TODO: is dit een fix? En waaraom wordt er een load gedaan van een array vlak voor printf?
                         # TODO: zet in aparte functie
+                        if self._positiontables[-1].position(variables[0]) is None:
+                            if tokens[3] == 'float':
+                                self._positiontables[-1].allocate_float_temp(variables[0])
+                            else:
+                                self._positiontables[-1].allocate_temp(variables[0])
                         to_register = self._positiontables[-1].position(variables[0])
                         if len(variables) > 1:
                             from_register = self._positiontables[-1].position(variables[1])
-                            self._textFragment += 'move {}, {}\n'.format(to_register, from_register)
+                            if '$f' in from_register:
+                                self._textFragment += 'mov.s {}, {}\n'.format(to_register, from_register)
+                            else:
+                                self._textFragment += 'move {}, {}\n'.format(to_register, from_register)
                         else:
                             value = tokens[5]
                             self._textFragment += 'li {}, {}\n'.format(to_register, value)
@@ -585,6 +644,44 @@ class LLVMTranspiler:
                     if rhs[0] == '%':
                         rhs = self._positiontables[-1].position(rhs)
                     self._textFragment += '{} {}, {}, {}\n'.format(comparator, to_register, lhs, rhs)
+
+                elif tokens[2] == 'fcmp':
+                    # TODO: zet in aparte functie
+                    self._positiontables[-1].allocate_temp(tokens[0])
+                    to_register = self._positiontables[-1].position(tokens[0])
+                    comparator = 's' + tokens[3][1:]
+                    lhs = self._positiontables[-1].position(tokens[5])
+                    rhs = tokens[6]
+                    self._textFragment += 'mfc1 {}, {}\n'.format(to_register, lhs)
+                    if rhs[0] == '%':
+                        rhs = self._positiontables[-1].position(rhs)
+                        self._textFragment += 'mfc1 $v1, {}\n'.format(rhs)
+                        rhs = '$v1'
+                    else:
+                        rhs = rhs[:-8]
+                    self._textFragment += '{} {} , {}, {}\n'.format(comparator, to_register, to_register, rhs)
+
+                elif tokens[2] == 'fptosi':
+                    # TODO: zet in aparte functie
+                    if variables[0] not in self._positiontables[-1].temporaries:
+                        self._positiontables[-1].allocate_temp(variables[0])
+                    from_register = self._positiontables[-1].position(variables[1])
+                    to_register = self._positiontables[-1].position(variables[0])
+                    self._textFragment += 'cvt.w.s $f31, {}\n'.format(from_register)
+                    self._textFragment += 'mfc1 {}, $f31\n\n'.format(to_register)
+
+                elif tokens[2] == 'sitofp':
+                    # TODO: zet in aparte functie
+                    if variables[0] not in self._positiontables[-1].f_temporaries:
+                        self._positiontables[-1].allocate_float_temp(variables[0])
+                    from_register = self._positiontables[-1].position(variables[1])
+                    to_register = self._positiontables[-1].position(variables[0])
+                    self._textFragment += 'mtc1 {}, $f31\n'.format(from_register)
+                    self._textFragment += 'cvt.s.w {}, $f31\n\n'.format(to_register)
+
+                elif tokens[2] == 'fpext':
+                    # cast to double, wordt alleen gebruikt bij printf voor floats te printen, moet niets speciaals doen
+                    self._positiontables[-1].assign_same_temporary(variables[0], variables[1])
 
         return retvalue
 

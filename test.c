@@ -2,24 +2,29 @@
 int a = 0;
 int b = 10;
 float c = 0.1;
-char test[] = {'%', 'i'};
 
-int f(int a, int b, int c, int d, int e){
-    return 0;
+int fibo(float count){
+    if (count == 1.0)
+        return 1;
+    if (count == 2.0)
+        return 1;
+    return fibo(count-1) + fibo(count-2);
 }
 
+int test[] = {37, 105, 0}; // %i
 
-void g(){
+int main(){
 
-}
+    float count = 3;
 
+//    int a =1;
+//    int b = 2;
+//    int c = 3;
+//    int d = 4;
+//    int e = 5;
+//    int f = (a-b)+(c+d)*e;
 
-float main(){
-int a = f(1,2,3,4,5);
-int b = 1;
-int c = 2;
-int d = 3;
-int e = 4;
-int t4 = (a-b)+(e*(c+d))+1;
+    int retvalue = fibo(count);
+    printf(test, retvalue);
 return 0;
 }
