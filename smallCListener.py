@@ -377,6 +377,15 @@ class smallCListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by smallCParser#stringValue.
+    def enterStringValue(self, ctx:smallCParser.StringValueContext):
+        pass
+
+    # Exit a parse tree produced by smallCParser#stringValue.
+    def exitStringValue(self, ctx:smallCParser.StringValueContext):
+        pass
+
+
     # Enter a parse tree produced by smallCParser#dereference.
     def enterDereference(self, ctx:smallCParser.DereferenceContext):
         pass

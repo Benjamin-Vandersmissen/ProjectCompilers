@@ -397,6 +397,14 @@ class customListener(smallCListener):
     def exitCharValue(self, ctx: smallCParser.CharValueContext):
         self.popStack()
 
+    # Enter a parse tree produced by smallCParser#stringValue.
+    def enterStringValue(self, ctx: smallCParser.StringValueContext):
+        self.generateBranch(StringValueNode(), ctx)
+
+    # Exit a parse tree produced by smallCParser#stringValue.
+    def exitStringValue(self, ctx: smallCParser.StringValueContext):
+        self.popStack()
+
     # Enter a parse tree produced by smallCParser#dereference.
     def enterDereference(self, ctx: smallCParser.DereferenceContext):
         self.generateBranch(DereferenceNode(), ctx)

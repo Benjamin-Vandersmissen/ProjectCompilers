@@ -66,7 +66,8 @@ declaration
         ;
 
 arrayDeclaration
-        : typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
+        : typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE ASSIGN stringValue
+        | typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE ASSIGN OPEN_CURLY arrayList CLOSE_CURLY
         | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE (ASSIGN OPEN_CURLY arrayList? CLOSE_CURLY)?
         ;
 
@@ -77,7 +78,8 @@ constantDeclaration
         ;
 
 constantArrayDeclaration
-        : typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE (ASSIGN OPEN_CURLY constantArrayList? CLOSE_CURLY)?
+        : typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE ASSIGN stringValue
+        | typeName identifier OPEN_SQUARE constantExpression CLOSE_SQUARE (ASSIGN OPEN_CURLY constantArrayList? CLOSE_CURLY)?
         | typeName identifier OPEN_SQUARE constantExpression? CLOSE_SQUARE (ASSIGN OPEN_CURLY constantArrayList? CLOSE_CURLY)
         ;
 
@@ -170,6 +172,10 @@ charValue
         : ASCII_CHARACTER
         ;
 
+stringValue
+        : STRING
+        ;
+
 dereference
         : AMPERSAND VARIABLE
         ;
@@ -208,9 +214,11 @@ DOT : '.';
 
 DIGIT : [0-9]+;
 SINGLE_QUOTE : '\'';
+DOUBLE_QUOTE : '"';
 
 WHITE_SPACE: [ \n\r\t]+ -> skip;
-ASCII_CHARACTER : SINGLE_QUOTE [\t-~] SINGLE_QUOTE;
+ASCII_CHARACTER : SINGLE_QUOTE [ -~] SINGLE_QUOTE;
+STRING : DOUBLE_QUOTE [ -~]* DOUBLE_QUOTE;
 
 IF : 'if';
 ELSE : 'else';

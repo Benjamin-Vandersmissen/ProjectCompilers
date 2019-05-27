@@ -214,6 +214,11 @@ class smallCVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by smallCParser#stringValue.
+    def visitStringValue(self, ctx:smallCParser.StringValueContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by smallCParser#dereference.
     def visitDereference(self, ctx:smallCParser.DereferenceContext):
         return self.visitChildren(ctx)

@@ -4,18 +4,27 @@ int b = 10;
 float c = 0.1;
 
 int fibo(int count){
+    if (count < 0){
+        char error[] = "Index needs to be higher than 0";
+        printf(error);
+        return -1;
+    }
     if (count == 1)
         return 1;
     if (count == 2)
         return 1;
     return fibo(count-1) + fibo(count-2);
 }
+
+
 int main(){
 
-    int test[] = {37, 105, 0};
+    char test[] = "fibo(%i) = %i"; // %i
 
-    int count = 15;
+    int count = 3;
     int retvalue = fibo(count);
-    printf(test, retvalue);
+    if (retvalue == -1)
+        return 1;
+    printf(test, count, retvalue);
 return 0;
 }

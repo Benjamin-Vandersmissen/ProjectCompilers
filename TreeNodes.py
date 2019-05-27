@@ -754,6 +754,8 @@ class ArrayDeclarationNode(ASTNode):
         if len(self.children) == 3:
             if isinstance(self.children[2], ArrayListNode):
                 size = len(self.children[2].children)
+            elif isinstance(self.children[2], StringValueNode):
+                size = len(self.children[2].value) + 1
             else:
                 size = self.children[2].value
         typename = typename + '[' + str(size) + ']'
@@ -1258,10 +1260,49 @@ class CharValueNode(ValueNode):
         self.value = token[1]
 
     def text(self):
-        return "'" + self.value + "'"
+        return 'char: {}'.format(ord(self.value))
 
     def type(self):
         return 'char'
+
+class StringValueNode(ValueNode):
+    def processToken(self, token):
+        self.value = token[1:-1]
+
+    def text(self):
+        return '"' + self.value + '"'
+
+    def type(self):
+        return "cstring"
+
+    def startDFS(self):
+        # Replace by an array of chars
+
+        replacement = ConstantArrayListNode()
+        replacement.parent = self.parent
+        index = self.parent.children.index(self)
+        self.parent.children[index] = replacement
+        i = 0
+        while i < len(self.value):
+            c = self.value[i]
+            node = CharValueNode()
+            if c == '\\' and i < len(self.value) - 1:
+                c += self.value[i+1]
+                i += 1
+                if c == '\\n':
+                    c = '\n'
+                elif c == '\\\\':
+                    c = '\\'
+                else:
+                    i += 1
+                    continue
+            node.value = c
+            replacement.add(node)
+            i += 1
+        node = CharValueNode()
+        node.value = chr(0)
+        replacement.add(node)
+        replacement.startDFS()
 
 
 class FunctionCallNode(ASTNode):

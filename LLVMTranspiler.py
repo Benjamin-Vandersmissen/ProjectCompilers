@@ -461,6 +461,9 @@ class LLVMTranspiler:
             self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register, var)
 
         else:  # use immediate
+            if to_register is None:
+                self._positiontables[-1].assign_same_temporary(tokens[0], tokens[4])
+            to_register = self._positiontables[-1].position(tokens[0])
             operator += 'i'
             self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register, rhs)
 
@@ -633,6 +636,7 @@ class LLVMTranspiler:
 
                 elif tokens[2] == 'icmp':
                     # TODO: zet in aparte functie
+                    self._positiontables[-1].allocate_temp(tokens[0])
                     to_register = self._positiontables[-1].position(tokens[0])
                     comparator = tokens[3]
                     lhs = tokens[5]
@@ -643,6 +647,8 @@ class LLVMTranspiler:
                     lhs = self._positiontables[-1].position(lhs)
                     if rhs[0] == '%':
                         rhs = self._positiontables[-1].position(rhs)
+                    elif comparator == 'slt':  # slt werkt niet met immediates, alle andere comparators wel
+                        comparator += 'i'
                     self._textFragment += '{} {}, {}, {}\n'.format(comparator, to_register, lhs, rhs)
 
                 elif tokens[2] == 'fcmp':
@@ -659,6 +665,8 @@ class LLVMTranspiler:
                         rhs = '$v1'
                     else:
                         rhs = rhs[:-8]
+                        if comparator == 'slt':
+                            comparator += 'i'
                     self._textFragment += '{} {} , {}, {}\n'.format(comparator, to_register, to_register, rhs)
 
                 elif tokens[2] == 'fptosi':
