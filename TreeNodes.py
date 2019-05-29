@@ -485,9 +485,9 @@ class DereferenceNode(ASTNode):
         varName = temp[0]
         typeAndAlign = temp[1]
         if returnType is None:
-            return llvm.changeLLVMType(str(typeAndAlign[0]), varName, funcDef, file) #, True)  # change c type: deleted " + '*'"
+            return llvm.changeLLVMType(str(typeAndAlign[0]), varName, funcDef, file)
         else:
-            return llvm.changeLLVMType(returnType, varName, funcDef, file) #, True)
+            return llvm.changeLLVMType(returnType, varName, funcDef, file)
 
 
 
@@ -925,6 +925,7 @@ class ConstantArrayDeclarationNode(ArrayDeclarationNode):
                     arrayList = self.children[3].children
             typename += ' x ' + str(self.children[0].typename) + ']'
             typeAndAlign = llvm.checkTypeAndAlign(typename, True)
+            self.parent.typeAndAlignTable[identifier] = typeAndAlign
             childType = llvm.getArrayTypeInfo(typeAndAlign[0])[1]
             file.write("@{} = global {} [".format(identifier, typeAndAlign[0][:-1]))
             if arrayList is not None:

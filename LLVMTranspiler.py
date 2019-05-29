@@ -255,9 +255,13 @@ class Stack:
 
 
 class LLVMTranspiler:
-    def __init__(self, filename):
-        self._llvmFile = open(filename, "r")
-        self._mipsFile = open(filename.split('.ll')[0] + '.asm', "w+")
+    def __init__(self, filename, fileLookALike=None):
+        if filename[-2:0] == 'll':
+            self._llvmFile = open(filename, "r")
+            open(filename.split('.ll')[0] + '.asm', "w+")
+        elif fileLookALike is not None:
+            self._llvmFile = fileLookALike
+            self._mipsFile = open(filename + '.asm', "w+")
         self._textFragment = ''
         self._dataFragment = ''
         self._positiontables = []

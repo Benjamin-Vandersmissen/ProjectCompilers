@@ -19,17 +19,21 @@ def main(argv):
     if parser._syntaxErrors > 0:
         exit(1)
 
-    # create the AST
-    listener = customListener()
-    walker = ParseTreeWalker()
-    walker.walk(listener, tree)
-    parser.addParseListener(listener)
+    try:
+        # create the AST
+        listener = customListener()
+        walker = ParseTreeWalker()
+        walker.walk(listener, tree)
+        parser.addParseListener(listener)
 
-    # print the AST to a dot file
-    dotFile = open(filename + ".dot", "w")
-    listener.AST.buildSymbolTable()
-    listener.AST.toDot(dotFile)
-    dotFile.close()
+        # print the AST to a dot file
+        dotFile = open(filename + ".dot", "w")
+        listener.AST.buildSymbolTable()
+        listener.AST.toDot(dotFile)
+        dotFile.close()
+    except Exception as e:
+        print(e)
+        exit(1)
 
     # create the llvm code
     llvmFile = open(filename + ".ll", "w+")

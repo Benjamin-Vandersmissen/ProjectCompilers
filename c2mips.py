@@ -6,6 +6,7 @@ from customListener import customListener
 from smallCLexer import smallCLexer
 from smallCParser import smallCParser
 from LLVMTranspiler import LLVMTranspiler
+from llvm import FileLookALike
 
 def main(argv):
     filename = argv[1][0:-2]
@@ -19,24 +20,32 @@ def main(argv):
     if parser._syntaxErrors > 0:
         exit(1)
 
-    # create the AST
-    listener = customListener()
-    walker = ParseTreeWalker()
-    walker.walk(listener, tree)
-    parser.addParseListener(listener)
+    try:
+        # create the AST
+        listener = customListener()
+        walker = ParseTreeWalker()
+        walker.walk(listener, tree)
+        parser.addParseListener(listener)
 
-    # print the AST to a dot file
-    dotFile = open(filename + ".dot", "w")
-    listener.AST.buildSymbolTable()
-    listener.AST.toDot(dotFile)
-    dotFile.close()
+        # print the AST to a dot file
+        dotFile = open(filename + ".dot", "w")
+        listener.AST.buildSymbolTable()
+        listener.AST.toDot(dotFile)
+        dotFile.close()
+    except Exception as e:
+        print(e)
+        exit(1)
 
     # create the llvm code
-    llvmFile = open(filename + ".ll", "w+")
-    listener.AST.toLLVM(llvmFile)
-    llvmFile.close()
+    if len(argv) == 3 and argv[2] == 'true':
+        llvmFile = open(filename + ".ll", "w+")
+        listener.AST.toLLVM(llvmFile)
+        llvmFile.close()
+    else:
+        llvmFile = FileLookALike()
+        listener.AST.toLLVM(llvmFile)
 
-    transpiler = LLVMTranspiler(filename + ".ll")
+    transpiler = LLVMTranspiler(filename, llvmFile)
     transpiler.transpile()
 
 if __name__ == '__main__':

@@ -9,6 +9,9 @@ class FileLookALike():
     def write(self, text):
         self.text += text
 
+    def read(self):
+        return self.text
+
     # Return the content of the tempFile in one line of llvm code
     # Expects endVar to be a llvm variable that is returned by the executed toLLVM function
     def putOnOneLine(self, endVar, funcDef, codeBody):
