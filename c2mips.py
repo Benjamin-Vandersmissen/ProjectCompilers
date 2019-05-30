@@ -41,6 +41,7 @@ def main(argv):
         llvmFile = open(filename + ".ll", "w+")
         listener.AST.toLLVM(llvmFile)
         llvmFile.close()
+        llvmFile = open(filename + '.ll', "r")
     else:
         llvmFile = FileLookALike()
         listener.AST.toLLVM(llvmFile)
