@@ -584,18 +584,17 @@ class IfStatementNode(ASTNode):
         if not isinstance(self.children[0], ComparisonNode):
             resultLLVMVar = llvm.writeLLVMCompareWithZero(resultLLVMVar, funcDef, codeBody, file)
 
-        global labelCounter  # TODO: llvm: niet met global counter werken maar deel van de if statement nemen voor naam
+        global labelCounter
         labelCounter += 1
-        label1 = 'something' + str(labelCounter)
+        label1 = 'if' + str(labelCounter)
 
-        labelCounter += 1
-        label2 = 'something' + str(labelCounter)
+        label2 = 'endif' + str(labelCounter)
 
         # Check if there's an else statement, if so also pre-write the codeBody of the else statement
         label3 = 'ERROR'
         if ELSE:
-            labelCounter += 1
-            label3 = 'something' + str(labelCounter)
+            label2 = 'else' + str(labelCounter)
+            label3 = 'endif' + str(labelCounter)
 
         # br i1 %5, %something1, %something2
         file.write('br i1 ' + str(resultLLVMVar) + ', label %' + str(label1) + ', label %' + str(label2) + '\n\n')
@@ -627,9 +626,9 @@ class IfStatementNode(ASTNode):
 
 class WhileStatementNode(ASTNode):
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
-        global labelCounter  # TODO: llvm: niet met global counter werken maar deel van de if statement nemen voor naam
+        global labelCounter
         labelCounter += 1
-        label1 = 'something' + str(labelCounter)
+        label1 = 'while' + str(labelCounter)
         # br label %something1  (while check)
         file.write('br label %' + str(label1) + '\n\n')
 
@@ -640,10 +639,9 @@ class WhileStatementNode(ASTNode):
         if not isinstance(self.children[0], ComparisonNode):
             resultLLVMVar = llvm.writeLLVMCompareWithZero(resultLLVMVar, funcDef, codeBody, file)
 
-        labelCounter += 1
-        label2 = 'something' + str(labelCounter)
-        labelCounter += 1
-        label3 = 'something' + str(labelCounter)
+        label2 = 'inwhile' + str(labelCounter)
+
+        label3 = 'endwhile' + str(labelCounter)
 
         # br i1 %3, label %something2, label %something3
         file.write('br i1 ' + str(resultLLVMVar) + ', label %' + str(label2) + ', label %' + str(label3) + '\n\n')
@@ -1242,7 +1240,7 @@ class FloatValueNode(ValueNode):
         if self.integer is None:
             self.integer = int(token)
         else:
-            self.fraction = int(token)
+            self.fraction = token
             self.value = float(str(self.integer) + '.' + str(self.fraction))
 
     def text(self):
@@ -1697,7 +1695,12 @@ class ComparisonNode(OperationNode):
         return True
 
     def mergeType(self, type1, type2):
-        return 'int'
+        if type1 == type2:
+            return type1
+        if type1 in ['char', 'int'] and type2 in ['int', 'float']:
+            return type2
+        if type1 in ['int', 'float'] and type2 in ['char', 'int']:
+            return type1
 
     def type(self):
         type = None
