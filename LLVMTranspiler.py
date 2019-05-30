@@ -174,7 +174,7 @@ class Stack:
     def allocate_float(self, variable):
         self.f_variables[variable] = '$f{}'.format(20 + len(self.f_variables))
 
-    # allocate an arrau on the stack
+    # allocate an array on the stack
     def allocate_array(self, variable, size):
         for i in range(int(size)):
             self._stack.append(variable)
@@ -226,7 +226,7 @@ class Stack:
             offset = (self._arguments - int(variable[1:])) * 4
             return '{}($fp)'.format(offset)
 
-    def add_pointer(self, pointer, pointee, offset=0):  # voeg pointer toe (vooral gebruikt bij array indexing
+    def add_pointer(self, pointer, pointee, offset=0):  # voeg pointer toe (vooral gebruikt bij array indexing)
         offset = int(offset)
         while pointee not in self._stack and pointee[0] != '@':
             pointee, increase = self._pointers[pointee]
