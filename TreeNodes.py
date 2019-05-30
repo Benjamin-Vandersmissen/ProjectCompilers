@@ -1425,7 +1425,7 @@ class FunctionCallNode(ASTNode):
                 typeAndAlign = llvm.checkTypeAndAlign(llvm.getLLVMTypeOfVariable(arguments[i], funcDef, codeBody))
                 if typeAndAlign[0] == 'float' and (self.children[0].identifier == 'printf' or self.children[0].identifier == 'scanf'):
                     #TODO: more hacky code for printf shenanigans
-                    typeAndAlign = ('i64', typeAndAlign[1]) # TODO: was double but should be i64 right?
+                    typeAndAlign = ('i64', typeAndAlign[1])
                 if i != 0:
                     file.write(', ')
                 if llvm.getArrayTypeInfo(typeAndAlign[0]):  # convert array to pointer

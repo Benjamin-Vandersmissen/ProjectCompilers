@@ -160,7 +160,7 @@ def checkTypeAndAlign(typename, CVariable=False):
             for _ in range(arrayTypePointerAmount):
                 typename += '*'
         typename = '[' + str(arrayTypeInfo[0]) + ' x ' + str(typename) + ']'
-        align = '16'  # TODO: llvm: ik dacht eerst dat het van de align afhing maar ik denk combinatie met type en lengte
+        align = '16'
 
     # If pointer, add the stars to the type
     if pointerAmount != 0:
