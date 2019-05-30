@@ -117,7 +117,7 @@ arrayElement
         ;
 
 assignment
-        : (identifier|dereference|depointer) ASSIGN expression
+        : (identifier|depointer) ASSIGN expression
         | arrayElement ASSIGN expression
         ;
 
