@@ -1,28 +1,16 @@
-//#include <stdio.h>
+#include <stdio.h>
 
-//char text[] = {'%', 'i'};
-//int number = 17536;
+int number = 17536;
 
 int main() {
-//    int* pointer = &number;
-//
-//    int depointer = *pointer;
-//
-//    printf(text, depointer);
+    int* pointer = &number;
 
-    float a = 0.67;
+    *pointer = 10;
 
-    if ((a + 10) == (10.07 * a + 17 / a)){}
-    else {}
+    int depointer = *pointer;
 
-    while ((a + 10) == (10.07 * a + 17 / a)){
-
-    }
-
-
-//    if (a == 'a'){}
-//
-//    if (a == 10){}
+    char a[] = "%i\n";
+    printf(a, depointer);
 
     return 0;
 }

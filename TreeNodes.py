@@ -529,9 +529,15 @@ class DepointerNode(ASTNode):
             if self.depointer[i] != '*':
                 break
         var = llvm.getValueOfVariable(self.depointer[depointerAmount:len(self.depointer)], funcDef, codeBody, file)
-        for _ in range(depointerAmount): # - 1):
+        for _ in range(depointerAmount - 1):
             var = llvm.getValueOfVariable(var, funcDef, codeBody, file)
         # var = llvm.getValueOfVariable(var, funcDef, codeBody, file)
+
+        if returnType != 'ASSIGN':
+            var = llvm.getValueOfVariable(var, funcDef, codeBody, file)
+        else:
+            returnType = None
+
         if returnType is None:
             return var
         else:
@@ -1127,7 +1133,7 @@ class AssignmentNode(ASTNode):
 
     def startDFS(self):
         # TODO: check this for array elements assigning to self as well
-        if not isinstance(self.children[0], ArrayElementNode):
+        if not isinstance(self.children[0], ArrayElementNode) and not isinstance(self.children[0], DepointerNode):
             identifier = self.children[0].identifier
             if isinstance(self.children[1], IdentifierNode):  # Assign identifier to same identifier
                 if identifier == self.children[1].identifier:
@@ -1164,6 +1170,8 @@ class AssignmentNode(ASTNode):
 
     def toLLVM(self, file, funcDef=None, codeBody=None, returnType=None):
         if isinstance(self.children[0], ArrayElementNode):
+            var = llvm.writeLLVMStoreForCVariable(self.children[0].toLLVM(file, funcDef, codeBody, 'ASSIGN'), self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
+        elif isinstance(self.children[0], DepointerNode):
             var = llvm.writeLLVMStoreForCVariable(self.children[0].toLLVM(file, funcDef, codeBody, 'ASSIGN'), self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
         else:
             var = llvm.writeLLVMStoreForCVariable(self.children[0].identifier, self.children[1].toLLVM(file, funcDef, codeBody), funcDef, codeBody, file)
@@ -1701,6 +1709,7 @@ class ComparisonNode(OperationNode):
             return type2
         if type1 in ['int', 'float'] and type2 in ['char', 'int']:
             return type1
+        return 'int'
 
     def type(self):
         type = None
