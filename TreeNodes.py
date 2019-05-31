@@ -507,7 +507,14 @@ class DepointerNode(ASTNode):
 
     def type(self):
         identifier = self.depointer.split('*')[-1]
-        type = symbolTables[-1].getEntry(identifier)
+        if len(symbolTables) != 0:
+            type = symbolTables[-1].getEntry(identifier)
+        else:
+            parent = self.parent
+            while parent.symbolTable is None:
+                parent = parent.parent
+            if parent.symbolTable.exists(identifier):
+                type = parent.symbolTable.getEntry(identifier)
         type = type.split('*')[0] + (type.count('*') - self.depointer.count('*')) * '*'
         return type
 
