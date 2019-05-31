@@ -1430,7 +1430,10 @@ class FunctionCallNode(ASTNode):
             # call void @f2(i32 %2, i32 %3)
             for i in range(len(self.children[1].children)):
                 # child = self.children[1].children[i]
-                typeAndAlign = llvm.checkTypeAndAlign(llvm.getLLVMTypeOfVariable(arguments[i], funcDef, codeBody))
+                if isinstance(self.children[1].children[i], ValueNode):
+                    typeAndAlign = llvm.checkTypeAndAlign(self.children[1].children[i].type())
+                else:
+                    typeAndAlign = llvm.checkTypeAndAlign(llvm.getLLVMTypeOfVariable(arguments[i], funcDef, codeBody))
                 if typeAndAlign[0] == 'float' and (self.children[0].identifier == 'printf' or self.children[0].identifier == 'scanf'):
                     #TODO: more hacky code for printf shenanigans
                     typeAndAlign = ('i64', typeAndAlign[1])
