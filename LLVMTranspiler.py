@@ -155,6 +155,8 @@ def uniques(register_map: dict):
 #               $v1 = temporary register voor int bewerkingen, bijv int direct naar stack schrijven
 #               $f31 = temporary register voor float bewerkingen, bijv. float naar int converten
 class Stack:
+    globalTypeTable = dict()
+
     def __init__(self):
         self._stack = []
         self._pointers = dict()
@@ -224,25 +226,37 @@ class Stack:
             return '{}($sp)'.format(4 * (1 + list(reversed(self._stack)).index(variable)))
 
         elif variable in self._pointers:  # pointer to variable
-            pointee, offset = self._pointers[variable]
+            pointee, offset, variable_offset = self._pointers[variable]
 
             if pointee[0] == '@':  # globale variabele
                 return '{} + {}'.format(getGlobalName(pointee), 4*offset)
             else:  # variable on stack
                 # Find occurence (offset + 1) in the stack
-                return '{}($sp)'.format(4 * (1 + [i for i, n in enumerate(list(reversed(self._stack))) if n == pointee][offset]))
+                return '{}($sp)'.format(4 * (1 + list(reversed(self._stack)).index(pointee) + offset) )
 
         elif int(variable[1:]) < self._arguments:  # function argument
             offset = (self._arguments - int(variable[1:])) * 4
             return '{}($fp)'.format(offset)
 
     def add_pointer(self, pointer, pointee, offset=0):  # voeg pointer toe (vooral gebruikt bij array indexing)
-        offset = int(offset)
+        if '%' in offset:
+            variable_offset = [offset]
+            offset = 0
+        else:
+            offset = int(offset)
+            variable_offset = []
         while pointee not in self._stack and pointee[0] != '@':
-            pointee, increase = self._pointers[pointee]
+            pointee, increase, variables = self._pointers[pointee]
             offset += increase
-        self._pointers[pointer] = pointee, offset
-        self.typeTable[pointer] = self.typeTable[pointee]
+            variable_offset += variables
+
+        self._pointers[pointer] = pointee, offset, variable_offset
+
+        if pointee in Stack.globalTypeTable:
+            self.typeTable[pointer] = Stack.globalTypeTable[pointee]
+
+        if pointee in self.typeTable:
+            self.typeTable[pointer] = self.typeTable[pointee]
 
     def store_registers(self):  # sla alle gebruikte registers op op de stack (voor functiecall)
         retvalue = ""
@@ -306,6 +320,8 @@ class LLVMTranspiler:
     def globalAssignment(self, tokens):
         global_variable = getGlobalName(tokens[0])
         type = tokens[3]
+
+        Stack.globalTypeTable[tokens[0]] = type
 
         if type[0] == '[':  # Array type
             if 'float' in tokens[5]:
@@ -601,8 +617,9 @@ class LLVMTranspiler:
         self._positiontables[-1].add_variable_type(tokens[0], type)
 
     def branch(self, tokens):
-        if tokens[1] == 'label':  # end of an if scope
-            self._textFragment += self._positiontables[-1].end_scope()
+        if tokens[1] == 'label':
+            if 'endif' in tokens[2]:  # end if scope
+                self._textFragment += self._positiontables[-1].end_scope()
             self._textFragment += 'b {}\n\n'.format(tokens[2][1:])
         else:
             condition = tokens[2]
@@ -610,6 +627,13 @@ class LLVMTranspiler:
             label_true = tokens[4][1:]
             label_false = tokens[6][1:]
             self._textFragment += 'bnez {}, {}\n'.format(cond_register, label_true)
+
+            if 'endwhile' in label_false:  # end while scope
+                self._textFragment += self._positiontables[-1].end_scope()
+
+            if 'endif' in label_true and 'else' in label_false:  # end if scope in if-else construct
+                self._textFragment += self._positiontables[-1].end_scope()
+
             self._textFragment += 'beqz {}, {}\n\n'.format(cond_register, label_false)
 
     def load(self, tokens):
@@ -618,6 +642,8 @@ class LLVMTranspiler:
             lhs = tokens[0]
             type = tokens[3]
             rhs = tokens[5]
+
+            self._positiontables[-1].typeTable[lhs] = type
 
             if self._positiontables[-1].position(lhs) is None:
                 if tokens[3] == 'float':
@@ -728,6 +754,20 @@ class LLVMTranspiler:
         self._textFragment += 'cvt.w.s $f31, {}\n'.format(from_register)
         self._textFragment += 'mfc1 {}, $f31\n\n'.format(to_register)
 
+    def bitcast(self, tokens):
+        lhs = tokens[0]
+        rhs = tokens[4]
+        to_type = tokens[6]
+
+        if '@' in rhs:
+            self._positiontables[-1].allocate_temp(lhs, to_type)
+            to_register = self._positiontables[-1].position(lhs)
+            rhs = getGlobalName(rhs)
+            self._textFragment += 'lw {}, {}\n'.format(to_register, rhs)
+        else:
+            self._positiontables[-1].assign_same_temporary(lhs, rhs)
+
+
 
     # Returns the index of the first line not belonging to this scope
     def processScope(self, lines, index):
@@ -753,7 +793,7 @@ class LLVMTranspiler:
 
             elif tokens[0][-1] == ':':  # label
                 self._textFragment += '{}\n'.format(tokens[0])
-                if tokens[0].find('if') == 0:
+                if tokens[0].find('if') == 0 or tokens[0].find('else') == 0 or tokens[0].find('while') == 0:
                     self._positiontables[-1].start_scope()
 
             elif tokens[0] == 'store':  # store variable
@@ -779,6 +819,9 @@ class LLVMTranspiler:
 
                 # Allocate temporary for variable
                 use_floats = -1
+
+                # Aliases for llvm registers
+                aliases = dict()
                 if self._positiontables[-1].position(variables[0]) is None:
                     # variable heeft nog geen register ==> maak expression tree
                     expressions = []  # expressions voor in expression tree
@@ -792,6 +835,8 @@ class LLVMTranspiler:
                             elif use_floats == -1:
                                 use_floats = 0
                             expressions.append(data[j])
+                        elif len(temp_vars) == 2 and 'load' not in data[j] and 'call' not in data[j]:
+                            aliases[temp_vars[0]] = temp_vars[1]
 
                     if len(expressions) > 0:
                         tree = None
@@ -799,9 +844,17 @@ class LLVMTranspiler:
                         for k in range(1, len(expressions) + 1):
                             temp_tokens = expressions[-k]
                             temp_vars = [token for token in temp_tokens if token[0] == '%']
+
+                            while temp_vars[1] in aliases:
+                                temp_vars[1] = aliases[temp_vars[1]]
+
+                            while temp_vars[2] in aliases:
+                                temp_vars[2] = aliases[temp_vars[2]]
+
                             if tree is None:
                                 tree = ExpressionTree(temp_vars[0], temp_vars[1], temp_vars[2], temp_tokens, use_floats)
                             else:
+
                                 if not tree.addNode(temp_vars[0], temp_vars[1], temp_vars[2], temp_tokens):
                                     raise Exception("Ge moet hier nie zijn")  # pas dit zeker niet aan
 
@@ -874,6 +927,20 @@ class LLVMTranspiler:
                     # cast bool to int, wordt alleen gebruikt bij operaties met booleans.
                     # Booleans worden als int beschouwd in MIPS, dus deze functie doet niets in MIPS
                     self._positiontables[-1].assign_same_temporary(variables[0], variables[1])
+
+                elif tokens[2] == 'sext':
+                    # cast char to int.
+                    # chars worden als int beschouwd in MIPS, dus deze functie doet niets in MIPS
+                    self._positiontables[-1].assign_same_temporary(variables[0], variables[1])
+
+                elif tokens[2] == 'trunc':
+                    # cast int to char.
+                    # chars worden als int beschouwd in MIPS, dus deze functie doet niets in MIPS
+                    self._positiontables[-1].assign_same_temporary(variables[0], variables[1])
+
+                elif tokens[2] == 'bitcast':
+                    # cast pointer to other pointer
+                    self.bitcast(tokens)
 
         return retvalue
 
