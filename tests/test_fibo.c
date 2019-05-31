@@ -19,9 +19,12 @@ int fibo(int count){
 
 int main(){
 
-    char test[] = "fibo(%i) = %i"; // %i
+    char inp[] = "%i";
+
+    char test[] = "fibo(%i) = %i";
 
     int count = 3;
+    scanf(inp, &count);
     int retvalue = fibo(count);
     if (retvalue == -1)
         return 1;

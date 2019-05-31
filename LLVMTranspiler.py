@@ -184,9 +184,10 @@ class Stack:
         self.typeTable[variable] = type
 
     # allocate an array on the stack
-    def allocate_array(self, variable, size):
+    def allocate_array(self, variable, size, type):
         for i in range(int(size)):
             self._stack.append(variable)
+        self.typeTable[variable] = type
 
     # allocate temporary for a word
     def allocate_temp(self, variable, type):
@@ -241,6 +242,7 @@ class Stack:
             pointee, increase = self._pointers[pointee]
             offset += increase
         self._pointers[pointer] = pointee, offset
+        self.typeTable[pointer] = self.typeTable[pointee]
 
     def store_registers(self):  # sla alle gebruikte registers op op de stack (voor functiecall)
         retvalue = ""
@@ -355,7 +357,7 @@ class LLVMTranspiler:
         register = tokens[0]
         type = tokens[3]
         if '[' in tokens[3]:  # array
-            self._positiontables[-1].allocate_array(register, tokens[3][1:])
+            self._positiontables[-1].allocate_array(register, tokens[3][1:], tokens[5][:-1])
             self._textFragment += 'subu $sp, $sp, {}\n\n'.format(4 * int(tokens[3][1:]))
 
         else:  # Variable
@@ -384,15 +386,25 @@ class LLVMTranspiler:
 
                 elif '$t' in from_register:  # temporary word opslaan in variabele
                     self._textFragment += 'sw {}, {}\n'.format(from_register, to_register)
-            elif lhs_type == rhs_type+'*':
-                pass
-            elif lhs_type+'*' == rhs_type:
-                pass
+
+            elif lhs_type+'*' == rhs_type:  # pak referentie van variabele
+                from_register = self._positiontables[-1].position(value)
+                self._textFragment += 'la $v1, {}\n'.format(from_register)
+                self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
+
         else:  # sla immediate op op stack of in globale variabele
+            lhs_type = tokens[1]
+            rhs_type = self._positiontables[-1].typeTable[register]
             if '@' in to_register:
                 to_register = getGlobalName(to_register)
-            self._textFragment += 'li $v1, {}\n'.format(value)
-            self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
+
+            if lhs_type == rhs_type:
+                self._textFragment += 'li $v1, {}\n'.format(value)
+                self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
+
+            else:  # sla immediate op in pointer
+                self._textFragment += 'li $v1, {}\n'.format(value)
+                self._textFragment += 'sw $v1, ({})\n\n'.format(to_register)
 
         self._positiontables[-1].clear_temporaries()
 
@@ -431,7 +443,12 @@ class LLVMTranspiler:
             identifier = identifier[1:]
 
         elif identifier == '@scanf' and self._IOdefined:
-            pass  # TODO: implementeer
+            string_position = self._positiontables[-1].position(tokens[tokens.index(identifier) + 2])
+            self._textFragment += 'la $a0, {}\n'.format(string_position)
+            for j in range(tokens.index(identifier) + 4, len(tokens), 2):
+                parameters.append(tokens[j])
+            self._textFragment += 'li $a1, {}\n'.format(len(parameters))
+            identifier = identifier[1:]
 
         else:
             for j in range(tokens.index(identifier) + 2, len(tokens), 2):
@@ -448,8 +465,19 @@ class LLVMTranspiler:
                 from_register = self._positiontables[-1].position(parameter)
                 if '$f' in from_register:
                     self._textFragment += 'swc1 {}, {}($sp)\n'.format(from_register, stack_offset)
-                else:
+
+                elif '$t' in from_register:
                     self._textFragment += 'sw {}, {}($sp)\n'.format(from_register, stack_offset)
+
+                else:  # variabele op stack
+                    type = tokens[tokens.index(parameter)-1]  # hacky code, maar zou moeten werken.
+
+                    if type != self._positiontables[-1].typeTable[parameter]:
+                        self._textFragment += 'la $v1, {}\n'.format(from_register)
+                    else:
+                        self._textFragment += 'lw $v1, {}\n'.format(from_register)
+                    self._textFragment += 'sw $v1, {}($sp)\n'.format(stack_offset)
+
 
             elif parameter[0] == '@':  # parameter is global variabele
                 # Zou normaal nooit moeten gebeuren, want global wordt eerst in local ingeladen
@@ -593,11 +621,17 @@ class LLVMTranspiler:
             if '@' in rhs:
                 from_register = getGlobalName(rhs)
 
-            if type == 'float':
-                self._textFragment += 'lwc1 {}, {}\n'.format(to_register, from_register)
-            else:
-                self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
+            if '$sp' in from_register:  # load variable in temporary
+                if type == 'float':
+                    self._textFragment += 'lwc1 {}, {}\n'.format(to_register, from_register)
+                else:
+                    self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
 
+            else:  # depointer of temporary
+                if type == 'float':
+                    self._textFragment += 'lwc1 {}, ({})\n'.format(to_register, from_register)
+                else:
+                    self._textFragment += 'lw {}, ({})\n'.format(to_register, from_register)
     def compare(self, tokens):
         self._positiontables[-1].allocate_temp(tokens[0], 'i1')
         to_register = self._positiontables[-1].position(tokens[0])
