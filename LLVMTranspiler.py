@@ -329,6 +329,8 @@ class LLVMTranspiler:
             self._dataFragment += '{}: {} '.format(global_variable, type)
             for i in range(7, len(tokens) - 2, 2):
                 value = tokens[i].split(']')[0]
+                if value == 'null':
+                    value = '0'
                 if type == '.float':
                     value = struct.unpack('!f', bytes.fromhex(value[2:]))[0]
                 if i > 7:
@@ -497,8 +499,12 @@ class LLVMTranspiler:
             identifier = identifier[1:]
 
         else:
-            for j in range(tokens.index(identifier) + 2, len(tokens), 2):
+            j = tokens.index(identifier) + 2
+            while j < len(tokens):
+                if tokens[j] == 'signext':
+                    j += 1
                 parameters.append(tokens[j])
+                j += 2
 
             identifier = getGlobalName(identifier)
 
@@ -685,7 +691,8 @@ class LLVMTranspiler:
 
             else:  # depointer of temporary
                 if type == 'float':
-                    self._textFragment += 'lwc1 {}, ({})\n'.format(to_register, from_register)
+                    self._textFragment += 'lw $v1, ({})\n'.format(from_register)
+                    self._textFragment += 'mtc1 $v1, {}\n'.format(to_register)
                 else:
                     self._textFragment += 'lw {}, ({})\n'.format(to_register, from_register)
 
