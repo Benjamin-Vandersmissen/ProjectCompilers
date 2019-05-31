@@ -159,20 +159,29 @@ class Stack:
         self._stack = []
         self._pointers = dict()
         self.temporaries = dict()
-        self.variables = dict()
         self.f_temporaries = dict()
-        self.f_variables = dict()
+        self.typeTable = dict()
         # Aantal argumenten in deze scope,
         # stel dat er registers gerefereerd worden die nooit gestored zijn, dan kunnen dit argumenten zijn
         self._arguments = 0
+        self._scopes = []
 
-    # allocate variable for a word
-    def allocate(self, variable):
-        self.variables[variable] = '$s{}'.format(len(self.variables))
+    # start een nieuwe scope bij ==> hou het einde van de stack van de vorige scope bij
+    def start_scope(self):
+        self._scopes.append(len(self._stack))
 
-    # allocate variable for a float
-    def allocate_float(self, variable):
-        self.f_variables[variable] = '$f{}'.format(20 + len(self.f_variables))
+    # eindig een scope ==> reset stack naar vorige positie
+    def end_scope(self):
+        last_scope = self._scopes[-1]
+        retvalue = 'addu $sp, $sp, {}\n'.format(4*(len(self._stack)-last_scope))
+        self._stack = self._stack[:last_scope]
+        self._scopes.pop()
+        return retvalue
+
+    # allocate variable on stack
+    def allocate(self, variable, type):
+        self._stack.append(variable)
+        self.typeTable[variable] = type
 
     # allocate an array on the stack
     def allocate_array(self, variable, size):
@@ -180,12 +189,18 @@ class Stack:
             self._stack.append(variable)
 
     # allocate temporary for a word
-    def allocate_temp(self, variable):
+    def allocate_temp(self, variable, type):
         self.temporaries[variable] = '$t{}'.format(uniques(self.temporaries))
+        self.typeTable[variable] = type
 
     # allocate temporary for a float
-    def allocate_float_temp(self, variable):
+    def allocate_float_temp(self, variable, type):
         self.f_temporaries[variable] = '$f{}'.format(uniques(self.f_temporaries))
+        self.typeTable[variable] = type
+
+    # save the type of a variable
+    def add_variable_type(self, variable, type):
+        self.typeTable[variable] = type
 
     # clear all temporary variables
     def clear_temporaries(self):
@@ -204,14 +219,8 @@ class Stack:
         elif variable in self.f_temporaries:  # temporary float
             return self.f_temporaries[variable]
 
-        elif variable in self.variables:  # variable word
-            return self.variables[variable]
-
-        elif variable in self.f_variables:  # variable float
-            return self.f_variables[variable]
-
         elif variable in self._stack:  # variable on stack
-            return '{}($sp)'.format(4 * (1 + self._stack.index(variable)))
+            return '{}($sp)'.format(4 * (1 + list(reversed(self._stack)).index(variable)))
 
         elif variable in self._pointers:  # pointer to variable
             pointee, offset = self._pointers[variable]
@@ -220,7 +229,7 @@ class Stack:
                 return '{} + {}'.format(getGlobalName(pointee), 4*offset)
             else:  # variable on stack
                 # Find occurence (offset + 1) in the stack
-                return '{}($sp)'.format(4 * (1 + [i for i, n in enumerate(self._stack) if n == pointee][offset]))
+                return '{}($sp)'.format(4 * (1 + [i for i, n in enumerate(list(reversed(self._stack))) if n == pointee][offset]))
 
         elif int(variable[1:]) < self._arguments:  # function argument
             offset = (self._arguments - int(variable[1:])) * 4
@@ -239,14 +248,8 @@ class Stack:
         for temp in set(self.f_temporaries.values()):
             retvalue += "swc1 {}, -{}($sp)\n".format(temp, i)
             i += 4
-        for var in set(self.f_variables.values()):
-            retvalue += "swc1 {}, -{}($sp)\n".format(var, i)
-            i += 4
         for temp in set(self.temporaries.values()):
             retvalue += "sw {}, -{}($sp)\n".format(temp, i)
-            i += 4
-        for var in set(self.variables.values()):
-            retvalue += "sw {}, -{}($sp)\n".format(var, i)
             i += 4
         retvalue += "subu $sp, $sp, {}\n\n".format(i)
         return retvalue
@@ -254,17 +257,10 @@ class Stack:
     def load_registers(self):  # laad alle gebruikte registers terug in (na functiecall)
         retValue = ""
         i = 0
-        for var in reversed(list(set(self.variables.values()))):
-            i += 4
-            retValue += "lw {}, {}($sp)\n".format(var, i)
 
         for temp in reversed(list(set(self.temporaries.values()))):
             i += 4
             retValue += "lw {}, {}($sp)\n".format(temp, i)
-
-        for var in reversed(list(set(self.f_variables.values()))):
-            i += 4
-            retValue += "lwc1 {}, {}($sp)\n".format(var, i)
 
         for temp in reversed(list(set(self.f_temporaries.values()))):
             i += 4
@@ -279,6 +275,8 @@ class Stack:
             self.temporaries[newRegister] = self.temporaries[oldRegister]
         if oldRegister in self.f_temporaries:
             self.f_temporaries[newRegister] = self.f_temporaries[oldRegister]
+
+        self.typeTable[newRegister] = self.typeTable[oldRegister]
 
 
 class LLVMTranspiler:
@@ -337,11 +335,16 @@ class LLVMTranspiler:
         # Argumenten worden opgeslagen op de stack
 
         self._positiontables.append(Stack())
+        for i in range(len(tokens)-4):  # save argument types
+            type = tokens[3+i]
+            self._positiontables[-1].add_variable_type('%{}'.format(i), type)
         name = getGlobalName(tokens[2])
         self._textFragment += '\n{}:\n'.format(name)
         self._textFragment += 'sw $fp, ($sp) \nmove $fp, $sp \nsubu $sp, $sp, 8 \nsw $ra, -4($fp)\n\n'
 
         argumentSize = len(tokens) - 4
+
+        # TODO: als ooit tijd : argumenten duidelijker meegeven aan extra classe
         self._positiontables[-1]._arguments = argumentSize
 
     def restorePtrs(self):
@@ -350,58 +353,46 @@ class LLVMTranspiler:
 
     def allocate(self, tokens):
         register = tokens[0]
+        type = tokens[3]
         if '[' in tokens[3]:  # array
             self._positiontables[-1].allocate_array(register, tokens[3][1:])
             self._textFragment += 'subu $sp, $sp, {}\n\n'.format(4 * int(tokens[3][1:]))
-        elif tokens[3] == 'float':
-            self._positiontables[-1].allocate_float(register)
-        else:
-            self._positiontables[-1].allocate(register)
+
+        else:  # Variable
+            self._positiontables[-1].allocate(register, type)
+            self._positiontables[-1].add_variable_type(register, type)
+            self._textFragment += 'subu $sp, $sp, 4\n'
 
     def store(self, tokens):
         value = tokens[2]
         register = tokens[4]
         to_register = self._positiontables[-1].position(register)
 
-        if '%' in value:
-            from_register = self._positiontables[-1].position(value)
-            if '$fp' in from_register:  # functie argumenten opslaan in variabelen
-                if tokens[1] == 'float':
-                    self._textFragment += 'lwc1 {}, {}\n'.format(to_register, from_register)
-                else:
-                    self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
+        if '%' in value:  # sla temporary op op de stack of sla argumenten op op stack
+            lhs_type = self._positiontables[-1].typeTable[value]
+            rhs_type = self._positiontables[-1].typeTable[register]
 
-            elif '$f' in from_register:  # float variabele opslaan in andere float variabele
-                if '@' in to_register:
-                    to_register = getGlobalName(to_register)
-                    self._textFragment += 'swc1 {}, {}\n'.foramt(from_register, to_register)
-                else:
-                    self._textFragment += 'mov.s {}, {}\n'.format(to_register, from_register)
+            if lhs_type == rhs_type:
+                from_register = self._positiontables[-1].position(value)
 
-            else:  # 'normale' variabele opslaan in andere 'normale' variabele
-                if '@' in to_register:
-                    to_register = getGlobalName(to_register)
+                if '$fp' in from_register:  # functie argumenten opslaan op stack in frame
+                    self._textFragment += 'lw $v1, {}\n'.format(from_register)
+                    self._textFragment += 'sw $v1, {}\n'.format(to_register)
+
+                elif '$f' in from_register:  # temporary float opslaan in variabele
+                    self._textFragment += 'swc1 {}, {}\n'.format(from_register, to_register)
+
+                elif '$t' in from_register:  # temporary word opslaan in variabele
                     self._textFragment += 'sw {}, {}\n'.format(from_register, to_register)
-                else:
-                    self._textFragment += 'move {}, {}\n'.format(to_register, from_register)
-
-        else:
-            if '$sp' in to_register:  # immediate opslaan in stack (bijna altijd bij opslaan op bepaalde array index
-                # use v1 for temporary immediate loading
-                self._textFragment += 'li $v1, {}\n'.format(value)
-                self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
-
-            elif '@' in to_register: # immediate opslaan in globale variabele
-                # use v1 for temporary immediate loading
+            elif lhs_type == rhs_type+'*':
+                pass
+            elif lhs_type+'*' == rhs_type:
+                pass
+        else:  # sla immediate op op stack of in globale variabele
+            if '@' in to_register:
                 to_register = getGlobalName(to_register)
-                self._textFragment += 'li $v1, {}\n'.format(value)
-                self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
-
-            else: # immediate opslaan in variabele
-                if tokens[1] == 'float':
-                    self._textFragment += self.loadFloatImmediate(to_register, value)
-                else:
-                    self._textFragment += 'li {}, {}\n\n'.format(to_register, value)
+            self._textFragment += 'li $v1, {}\n'.format(value)
+            self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
 
         self._positiontables[-1].clear_temporaries()
 
@@ -476,13 +467,15 @@ class LLVMTranspiler:
         self._textFragment += self._positiontables[-1].load_registers()
 
         if tokens[0] != 'call':  # save return value
+            register = tokens[0]
+            type = tokens[3]
 
-            if self._positiontables[-1].position(tokens[0]) is None:
+            if self._positiontables[-1].position(register) is None:
                 if tokens[3] == 'float':
-                    self._positiontables[-1].allocate_float_temp(tokens[0])
+                    self._positiontables[-1].allocate_float_temp(register, type)
                 else:
-                    self._positiontables[-1].allocate_temp(tokens[0])
-            to_register = self._positiontables[-1].position(tokens[0])
+                    self._positiontables[-1].allocate_temp(register, type)
+            to_register = self._positiontables[-1].position(register)
 
             if '$f' in to_register:
                 self._textFragment += 'mtc1 $v0, {}\n\n'.format(to_register)
@@ -492,6 +485,7 @@ class LLVMTranspiler:
     def operation(self, tokens):
         to_register = self._positiontables[-1].position(tokens[0])
         operator = tokens[2]
+        type = tokens[3]
         lhs = tokens[4]
         rhs = tokens[5]
 
@@ -521,15 +515,17 @@ class LLVMTranspiler:
                     self._positiontables[-1].assign_same_temporary(tokens[0], rhs)
                     to_register = self._positiontables[-1].position(tokens[0])
                 rhs = self._positiontables[-1].position(rhs)
-                operator += 'i'
                 self._textFragment += 'li $v1, {}\n'.format(lhs)
                 self._textFragment += '{} {}, $v1, {}\n'.format(operator, to_register, rhs)
 
             # rhs kan geen immediate zijn, want anders werd expressie gefold, rhs kan geen globale variabele zijn
 
+        self._positiontables[-1].add_variable_type(tokens[0], type)
+
     def float_operation(self, tokens):
         to_register = self._positiontables[-1].position(tokens[0])
         operator = tokens[2][1:] + '.s'
+        type = tokens[3]
         lhs = tokens[4]
         rhs = tokens[5]
 
@@ -564,8 +560,11 @@ class LLVMTranspiler:
 
             # rhs kan geen immediate zijn, want dan werd expression gefold, rhs kan geen globale variabele zijn
 
+        self._positiontables[-1].add_variable_type(tokens[0], type)
+
     def branch(self, tokens):
-        if tokens[1] == 'label':
+        if tokens[1] == 'label':  # end of an if scope
+            self._textFragment += self._positiontables[-1].end_scope()
             self._textFragment += 'b {}\n\n'.format(tokens[2][1:])
         else:
             condition = tokens[2]
@@ -579,35 +578,28 @@ class LLVMTranspiler:
         if tokens[3][0] != '[':
             # TODO: is dit een fix? En waarom wordt er een load gedaan van een array vlak voor printf?
             lhs = tokens[0]
+            type = tokens[3]
             rhs = tokens[5]
 
             if self._positiontables[-1].position(lhs) is None:
                 if tokens[3] == 'float':
-                    self._positiontables[-1].allocate_float_temp(lhs)
+                    self._positiontables[-1].allocate_float_temp(lhs, type)
                 else:
-                    self._positiontables[-1].allocate_temp(lhs)
+                    self._positiontables[-1].allocate_temp(lhs, type)
+
             to_register = self._positiontables[-1].position(lhs)
+            from_register = self._positiontables[-1].position(rhs)
 
-            if '%' in rhs:  # load from temporary variable
-                from_register = self._positiontables[-1].position(rhs)
-                if '$f' in from_register:
-                    self._textFragment += 'mov.s {}, {}\n'.format(to_register, from_register)
-                else:
-                    self._textFragment += 'move {}, {}\n'.format(to_register, from_register)
+            if '@' in rhs:
+                from_register = getGlobalName(rhs)
 
-            elif '@' in rhs:  # load from global variable
-                rhs = getGlobalName(rhs)
-                if '$f' in to_register:
-                    self._textFragment += 'lwc1 {}, {}\n'.format(to_register, rhs)
-                else:
-                    self._textFragment += 'lw {}, {}\n'.format(to_register, rhs)
-
-            else:  # load from immediate
-                value = tokens[5]
-                self._textFragment += 'li {}, {}\n'.format(to_register, value)
+            if type == 'float':
+                self._textFragment += 'lwc1 {}, {}\n'.format(to_register, from_register)
+            else:
+                self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
 
     def compare(self, tokens):
-        self._positiontables[-1].allocate_temp(tokens[0])
+        self._positiontables[-1].allocate_temp(tokens[0], 'i1')
         to_register = self._positiontables[-1].position(tokens[0])
         comparator = tokens[3]
         lhs = tokens[5]
@@ -639,7 +631,7 @@ class LLVMTranspiler:
             # als LHS een immediate is, dan kan RHS normaal alleen een temporary zijn, want anders wordt comparison gefold
 
     def float_compare(self, tokens):
-        self._positiontables[-1].allocate_temp(tokens[0])
+        self._positiontables[-1].allocate_temp(tokens[0], 'i1')
         to_register = self._positiontables[-1].position(tokens[0])
         comparator = 's' + tokens[3][1:]
         lhs = tokens[5]
@@ -674,7 +666,7 @@ class LLVMTranspiler:
         lhs = tokens[0]
         rhs = tokens[4]
         if lhs not in self._positiontables[-1].f_temporaries:
-            self._positiontables[-1].allocate_float_temp(lhs)
+            self._positiontables[-1].allocate_float_temp(lhs, 'float')
         from_register = self._positiontables[-1].position(rhs)
         to_register = self._positiontables[-1].position(lhs)
         self._textFragment += 'mtc1 {}, $f31\n'.format(from_register)
@@ -684,7 +676,7 @@ class LLVMTranspiler:
         lhs = tokens[0]
         rhs = tokens[4]
         if lhs not in self._positiontables[-1].temporaries:
-            self._positiontables[-1].allocate_temp(lhs)
+            self._positiontables[-1].allocate_temp(lhs, 'i31')
         from_register = self._positiontables[-1].position(rhs)
         to_register = self._positiontables[-1].position(lhs)
         self._textFragment += 'cvt.w.s $f31, {}\n'.format(from_register)
@@ -705,7 +697,6 @@ class LLVMTranspiler:
         i = -1
         while i < len(data) - 1:
             i += 1
-            # TODO: register spilling implementeren
             # TODO: pointers uitzoeken
 
             tokens = data[i]
@@ -716,6 +707,8 @@ class LLVMTranspiler:
 
             elif tokens[0][-1] == ':':  # label
                 self._textFragment += '{}\n'.format(tokens[0])
+                if tokens[0].find('if') == 0:
+                    self._positiontables[-1].start_scope()
 
             elif tokens[0] == 'store':  # store variable
                 self.store(tokens)
