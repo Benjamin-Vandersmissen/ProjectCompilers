@@ -151,7 +151,7 @@ def uniques(register_map: dict):
     return len(set(register_map.values()))
 
 
-# convention :  $f0->$f9 = temp float registers, $f20-$f29 = saved float registers
+# convention :  $f0->$f9 = temp float registers
 #               $v1 = temporary register voor int bewerkingen, bijv int direct naar stack schrijven
 #               $f31 = temporary register voor float bewerkingen, bijv. float naar int converten
 class Stack:
@@ -293,6 +293,7 @@ class LLVMTranspiler:
         self._dataFragment = ''
         self._positiontables = []
         self._IOdefined = False
+        self._textCreated = False
 
     def loadFloatImmediate(self, floatregister, hexFloat):
         retvalue = 'li $v1, {}\n'.format(hexFloat)
@@ -301,9 +302,6 @@ class LLVMTranspiler:
 
     def createTextFragment(self):
         self._textFragment += '\n.text\n'
-        self._textFragment += 'jal _main\n'
-        self._textFragment += 'li $v0 10\n'  # Exit the program responsibly
-        self._textFragment += 'syscall\n'
 
     def globalAssignment(self, tokens):
         global_variable = getGlobalName(tokens[0])
@@ -328,10 +326,18 @@ class LLVMTranspiler:
         value = tokens[4]
         if type == 'float':
             type = '.float'
-            value = struct.unpack('!f', bytes.fromhex(value[2:]))[0]
+            value = str(struct.unpack('!f', bytes.fromhex(value[2:]))[0])
         else:
             type = '.word'
-        self._dataFragment += '{}: {} {}\n'.format(global_variable, type, value)
+
+        if '@' in value:
+            value = getGlobalName(value)
+            self._dataFragment += '{}: {} 0\n'.format(global_variable, type)
+            self._textFragment += 'la $v1, {}\n'.format(value)
+            self._textFragment += 'sw $v1, {}\n\n'.format(global_variable)
+
+        else:
+            self._dataFragment += '{}: {} {}\n'.format(global_variable, type, value)
 
     def functionDefinition(self, tokens):
         # Argumenten worden opgeslagen op de stack
@@ -391,6 +397,11 @@ class LLVMTranspiler:
                 from_register = self._positiontables[-1].position(value)
                 self._textFragment += 'la $v1, {}\n'.format(from_register)
                 self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
+
+        elif '@' in value:  # sla pointer naar globale variabele op
+            value = getGlobalName(value)
+            self._textFragment += 'la $v1, {}\n'.format(value)
+            self._textFragment += 'sw $v1, {}\n'.format(to_register)
 
         else:  # sla immediate op op stack of in globale variabele
             lhs_type = tokens[1]
@@ -478,11 +489,10 @@ class LLVMTranspiler:
                         self._textFragment += 'lw $v1, {}\n'.format(from_register)
                     self._textFragment += 'sw $v1, {}($sp)\n'.format(stack_offset)
 
-
-            elif parameter[0] == '@':  # parameter is global variabele
-                # Zou normaal nooit moeten gebeuren, want global wordt eerst in local ingeladen
-                # Wordt erin gelaten voor eventuele fouten te vinden
-                print("Dit zou niet moeten gebeuren : {}".format(tokens))
+            elif parameter[0] == '@':  # parameter is global variabele, dus pointer naar globale variabele
+                parameter = getGlobalName(parameter)
+                self._textFragment += 'la $v1, {}\n'.format(parameter)
+                self._textFragment += 'sw $v1, {}($sp)\n'.format(stack_offset)
 
             else:  # parameter is een immediate
                 self._textFragment += 'li $v1, {}\n'.format(parameter)
@@ -620,8 +630,9 @@ class LLVMTranspiler:
 
             if '@' in rhs:
                 from_register = getGlobalName(rhs)
+                self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
 
-            if '$sp' in from_register:  # load variable in temporary
+            elif '$sp' in from_register:  # load variable in temporary
                 if type == 'float':
                     self._textFragment += 'lwc1 {}, {}\n'.format(to_register, from_register)
                 else:
@@ -632,6 +643,7 @@ class LLVMTranspiler:
                     self._textFragment += 'lwc1 {}, ({})\n'.format(to_register, from_register)
                 else:
                     self._textFragment += 'lw {}, ({})\n'.format(to_register, from_register)
+
     def compare(self, tokens):
         self._positiontables[-1].allocate_temp(tokens[0], 'i1')
         to_register = self._positiontables[-1].position(tokens[0])
@@ -888,6 +900,12 @@ class LLVMTranspiler:
                 self.globalAssignment(tokens)
             elif tokens[0] == 'define':
                 # function definition
+                if not self._textCreated:
+                    self._textFragment += 'jal _main\n'
+                    self._textFragment += 'li $v0 10\n'  # Exit the program responsibly
+                    self._textFragment += 'syscall\n'
+                    self._textCreated = True
+
                 self.functionDefinition(tokens)
                 in_function = True
             elif tokens[0] == '}':
@@ -896,14 +914,13 @@ class LLVMTranspiler:
             elif tokens[0] == 'declare':
                 if not self._IOdefined:
                     self._dataFragment += 'error: .asciiz "unrecognised parameter %"\n'
-                if tokens[2] == '@printf':
-                    self._textFragment += printf + '\n'
-                if tokens[2] == '@scanf':
-                    self._textFragment += scanf + '\n'
                 self._IOdefined = True
 
             i += 1
 
         self._mipsFile.write(self._dataFragment)
         self._mipsFile.write(self._textFragment)
+        if self._IOdefined:
+            self._mipsFile.write(printf)
+            self._mipsFile.write(scanf)
         self._mipsFile.close()
