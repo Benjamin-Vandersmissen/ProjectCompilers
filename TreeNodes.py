@@ -1731,6 +1731,19 @@ class ComparisonNode(OperationNode):
                     type = self.mergeType(type, child.type())
         return type
 
+    def foldExpression(self):
+        OperationNode.foldExpression(self)
+        if len(self.children) == 2 and isinstance(self.children[0], DereferenceNode) \
+            and isinstance(self.children[1], DereferenceNode):
+
+            value = self.children[0].dereference == self.children[1].dereference
+
+            node = IntValueNode()
+            node.value = value
+            node.parent = self.parent
+            index = self.parent.children.index(self)
+            self.parent.children[index] = node
+
 
 class OperatorAssignmentNode(ASTNode):
     def __init__(self):

@@ -319,11 +319,9 @@ class LLVMTranspiler:
 
     def globalAssignment(self, tokens):
         global_variable = getGlobalName(tokens[0])
-        type = tokens[3]
 
-        Stack.globalTypeTable[tokens[0]] = type
-
-        if type[0] == '[':  # Array type
+        if tokens[3][0] == '[':  # Array type
+            Stack.globalTypeTable[tokens[0]] = tokens[5][:-1]
             if 'float' in tokens[5]:
                 type = '.float'
             else:
@@ -339,7 +337,28 @@ class LLVMTranspiler:
             self._dataFragment += '\n'
             return
 
-        value = tokens[4]
+        if 'common' in tokens:  # default initialisation
+            value = tokens[5]
+            type = tokens[4]
+
+        elif 'getelementptr' in tokens:
+            print(tokens)
+            type = 'test'
+            value = 'test'
+
+        elif 'bitcast' in tokens:  # cast pointer of pointer to other global
+            value = tokens[6]
+            type = tokens[8]
+
+        else:  # normal initialisation with value
+            value = tokens[4]
+            type = tokens[3]
+
+        Stack.globalTypeTable[tokens[0]] = type
+
+        if value == 'null':
+            value = '0'
+
         if type == 'float':
             type = '.float'
             value = str(struct.unpack('!f', bytes.fromhex(value[2:]))[0])
