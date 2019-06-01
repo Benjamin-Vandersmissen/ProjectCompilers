@@ -7,6 +7,6 @@ then
       exit 1
 fi
 
-python3 c2llvm.py "$1"
+python3 c2mips.py "$1" true
 
 dot -Tpng "${1%.*}.dot" -o "${1%.*}.png"

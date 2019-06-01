@@ -232,16 +232,3 @@ int main(){
     a1 = &a - e;
     return *a1 + 12 * a;
 }
-
-//int main(){
-//    float k;
-//    int j = 5;
-//    j = 5+6*8;
-//    {
-//        int j = testDec(g, d, a, g1, d1, a1);
-////        printf(j); // Moet 10 zijn
-//    }
-////    printf(j,j); // Moet 55 zijn - kan niet meer kloppen
-//    j = j * j + j * (j + (j *3));
-//    return j;
-//}

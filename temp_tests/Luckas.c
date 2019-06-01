@@ -1,16 +1,17 @@
 #include <stdio.h>
 
-int number = 17536;
+int f(int a, int b){
+    return a + b;
+}
 
-int main() {
-    int* pointer = &number;
 
-    *pointer = 10;
-
-    int depointer = *pointer;
-
-    char a[] = "%i\n";
-    printf(a, depointer);
-
+int main(){
+    float a;
+    char text[] = "Type a float number:\n";
+    printf(text);
+    char scan[] = {'%', 'f', 0};
+    scanf(scan, &a);
+    char test[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
+    printf(test, a);
     return 0;
 }

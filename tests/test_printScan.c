@@ -7,6 +7,8 @@ int f(int a, int b){
 
 int main(){
     float a;
+    char text[] = "Type a float number:\n";
+    printf(text);
     char scan[] = {'%', 'f', 0};
     scanf(scan, &a);
     char test[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};
