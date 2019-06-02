@@ -6,6 +6,7 @@ Implemnted optional requirements:
 - error if no return statement is given in non-void function
 - conversion of types + warnings
 - pointer operations (which are allowed in C, examples in the test_llvm file)
+- char array assignment to a string
 
 
 tests:
