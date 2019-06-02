@@ -1,5 +1,14 @@
 class ExpressionTree:
-    def __init__(self, variable, left, right, expression, use_float_registers=False, parent=None):
+    # aliases voor het geval dat een operatie uit meerdere types variabelen bestaat die gecast worden naar andere types
+    # bv :  %3 = add %1, %2  <= %3, %2, %1 zijn ints
+    #       %4 = sitofp %3 <= %4 is float
+    #       %6 = fadd %4, %5 <= %5, %6 zijn floats
+    #
+    # De expression tree moet allebei de expressies bevatten, want %6 is afhankelijk van %3, maar %6 bevat %3 niet
+    # Aliases mapt dan %4 op %3, zodat de expressie van %3 toch verwerkt wordt
+    aliases = dict()
+
+    def __init__(self, variable, left, right, expression, parent=None):
         self.var = variable
         self.ershovNumber = None
         self.register = None
@@ -8,20 +17,24 @@ class ExpressionTree:
         self.expression = expression
         self.parent = parent
         self.base = 0
-        self.use_float_registers = use_float_registers
 
         if left is not None and right is not None:
-            self.left = ExpressionTree(left, None, None, None, self.use_float_registers, self)
-            self.right = ExpressionTree(right, None, None, None, self.use_float_registers, self)
+            self.left = ExpressionTree(left, None, None, None, self)
+            self.right = ExpressionTree(right, None, None, None, self)
 
     def addNode(self, var, left, right, expression):
+
+        alias_var = var
+        while alias_var in ExpressionTree.aliases:
+            alias_var = ExpressionTree.aliases[alias_var]
+
         if self.left is None or self.right is None:
             return False
-        if self.left.var == var:
-            self.left = ExpressionTree(var, left, right, expression, self.use_float_registers, self)
+        if self.left.var == alias_var:
+            self.left = ExpressionTree(var, left, right, expression, self)
             return True
-        elif self.right.var == var:
-            self.right = ExpressionTree(var, left, right, expression, self.use_float_registers, self)
+        elif self.right.var == alias_var:
+            self.right = ExpressionTree(var, left, right, expression, self)
             return True
         elif self.left.addNode(var, left, right, expression):
             return True
@@ -50,9 +63,7 @@ class ExpressionTree:
         operations = []
 
         if self.left is None or self.right is None:
-            if self.use_float_registers:
-                return {self.var: '$f{}'.format(self.register)}, []
-            return {self.var: '$t{}'.format(self.register)}, []
+            return {self.var: self.register}, []
 
         if self.left.ershovNumber == self.right.ershovNumber:
             pair = self.right.getRegisters(baseNumber + 1)
@@ -81,8 +92,5 @@ class ExpressionTree:
             registerMap.update(pair[0])
             operations += pair[1]
 
-        if self.use_float_registers:
-            registerMap[self.var] = '$f{}'.format(self.register)
-        else:
-            registerMap[self.var] = '$t{}'.format(self.register)
+        registerMap[self.var] = self.register
         return registerMap, operations + [self.expression]

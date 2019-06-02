@@ -168,6 +168,18 @@ class Stack:
         self._arguments = 0
         self._scopes = []
 
+    # update the temporary registers with a register_map from an expression tree
+    def update_registers(self, register_map):
+        float_base = uniques(self.f_temporaries)
+        int_base = uniques(self.temporaries)
+        for register in register_map:
+            if self.typeTable[register] == 'float':
+                register_number = float_base + register_map[register]
+                self.f_temporaries[register] = '$f{}'.format(20+register_number)
+            else:
+                register_number = int_base + register_map[register]
+                self.temporaries[register] = '$t{}'.format(register_number)
+
     # start een nieuwe scope bij ==> hou het einde van de stack van de vorige scope bij
     def start_scope(self):
         self._scopes.append(len(self._stack))
@@ -183,25 +195,25 @@ class Stack:
     # allocate variable on stack
     def allocate(self, variable, type):
         self._stack.append(variable)
-        self.typeTable[variable] = type
+        self.add_variable_type(variable, type)
 
     # allocate an array on the stack
     def allocate_array(self, variable, size, type):
         for i in range(int(size)):
             self._stack.append(variable)
-        self.typeTable[variable] = type
+        self.add_variable_type(variable, type)
 
     # allocate temporary for a word
     def allocate_temp(self, variable, type):
         if variable == '%39':  # TODO: delete
             print()
         self.temporaries[variable] = '$t{}'.format(uniques(self.temporaries))
-        self.typeTable[variable] = type
+        self.add_variable_type(variable, type)
 
     # allocate temporary for a float
     def allocate_float_temp(self, variable, type):
         self.f_temporaries[variable] = '$f{}'.format(uniques(self.f_temporaries))
-        self.typeTable[variable] = type
+        self.add_variable_type(variable, type)
 
     # save the type of a variable
     def add_variable_type(self, variable, type):
@@ -824,8 +836,6 @@ class LLVMTranspiler:
         else:
             self._positiontables[-1].assign_same_temporary(lhs, rhs)
 
-
-
     # Returns the index of the first line not belonging to this scope
     def processScope(self, lines, index):
         data = []
@@ -840,8 +850,6 @@ class LLVMTranspiler:
         i = -1
         while i < len(data) - 1:
             i += 1
-            # TODO: pointers uitzoeken
-
             tokens = data[i]
             variables = [token for token in tokens if token[0] == '%']
 
@@ -875,8 +883,6 @@ class LLVMTranspiler:
                 # catch all voor operaties die returnwaarde teruggeven en met up to date registers moeten werken
 
                 # Allocate temporary for variable
-                use_floats = -1
-
                 # Aliases for llvm registers
                 aliases = dict()
                 if self._positiontables[-1].position(variables[0]) is None:
@@ -887,13 +893,9 @@ class LLVMTranspiler:
                         if 'store' in data[j] or 'ret' in data[j] or 'br' in data[j]:  # expressie is hier volledig
                             break
                         elif len(temp_vars) == 3 and 'call' not in data[j]:
-                            if tokens[3] == 'float' and use_floats == -1:
-                                use_floats = 1
-                            elif use_floats == -1:
-                                use_floats = 0
                             expressions.append(data[j])
                         elif len(temp_vars) == 2 and 'load' not in data[j] and 'call' not in data[j]:
-                            aliases[temp_vars[0]] = temp_vars[1]
+                            aliases[temp_vars[1]] = temp_vars[0]
 
                     if len(expressions) > 0:
                         tree = None
@@ -902,14 +904,21 @@ class LLVMTranspiler:
                             temp_tokens = expressions[-k]
                             temp_vars = [token for token in temp_tokens if token[0] == '%']
 
-                            while temp_vars[1] in aliases:
-                                temp_vars[1] = aliases[temp_vars[1]]
-
-                            while temp_vars[2] in aliases:
-                                temp_vars[2] = aliases[temp_vars[2]]
+                            # update type tables for easier register assignment
+                            if 'icmp' in temp_tokens or 'fcmp' in temp_tokens:
+                                type = temp_tokens[4]
+                                self._positiontables[-1].add_variable_type(temp_vars[0], 'i1')
+                                self._positiontables[-1].add_variable_type(temp_vars[1], type)
+                                self._positiontables[-1].add_variable_type(temp_vars[2], type)
+                            else:
+                                type = temp_tokens[3]
+                                self._positiontables[-1].add_variable_type(temp_vars[0], type)
+                                self._positiontables[-1].add_variable_type(temp_vars[1], type)
+                                self._positiontables[-1].add_variable_type(temp_vars[2], type)
 
                             if tree is None:
-                                tree = ExpressionTree(temp_vars[0], temp_vars[1], temp_vars[2], temp_tokens, use_floats)
+                                tree = ExpressionTree(temp_vars[0], temp_vars[1], temp_vars[2], temp_tokens)
+                                ExpressionTree.aliases = aliases
                             else:
 
                                 if not tree.addNode(temp_vars[0], temp_vars[1], temp_vars[2], temp_tokens):
@@ -917,25 +926,24 @@ class LLVMTranspiler:
 
                         if tree is not None:
                             tree.getErshovNumber()
-                            if use_floats:
-                                basenumber = uniques(self._positiontables[-1].f_temporaries)
-                            else:
-                                basenumber = uniques(self._positiontables[-1].temporaries)
-                            register_map, new_operations = tree.getRegisters(basenumber)
+                            register_map, new_operations = tree.getRegisters(0)
 
                             if variables[0] in register_map:
                                 # update temporaries alleen als het effect heeft op deze statement
-                                if use_floats:
-                                    self._positiontables[-1].f_temporaries.update(register_map)
-                                else:
-                                    self._positiontables[-1].temporaries.update(register_map)
-
+                                self._positiontables[-1].update_registers(register_map)
                                 # re-order operations
                                 leftPart = data[:i]
                                 rightPart = data[j:]
                                 midPart = []
                                 for expression in new_operations:
                                     leftPart.append(expression)
+
+                                # update temporary registers for other expressions
+                                for expression in reversed(unused_expressions):
+                                    temp_vars = [token for token in expression if token[0] == '%']
+                                    if 'load' not in expression and 'call' not in expression:
+                                        self._positiontables[-1].assign_same_temporary(temp_vars[1], temp_vars[0])
+
                                 # insert unused expressions before the first used expression behind it
                                 for expression in unused_expressions:
                                     index = data[i:j].index(expression)
