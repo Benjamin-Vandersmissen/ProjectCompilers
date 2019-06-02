@@ -1,3 +1,5 @@
+// Test if warnings are given at needed moments
+
 int f(float* a){
     return 0;
 }

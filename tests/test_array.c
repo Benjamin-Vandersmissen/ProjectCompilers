@@ -1,3 +1,5 @@
+// Test all different kinds of arrays and accessing an element of it
+
 int a[] = {1,2,3,4};
 
 char test[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, 0};

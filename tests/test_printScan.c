@@ -1,3 +1,5 @@
+// Test if the print and scan function work properly
+
 #include <stdio.h>
 
 int f(int a, int b){

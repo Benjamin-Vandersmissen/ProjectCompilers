@@ -1,4 +1,4 @@
-// test not generating useless code after return statement
+// Test not generating useless code after return statement
 
 int test(){
     if(0){

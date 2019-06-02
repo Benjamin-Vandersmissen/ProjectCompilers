@@ -1,3 +1,5 @@
+// Test if the compiler can handle scopes, scopes in scopes, function scopes...
+
 #include <stdio.h>
 
 char text[] = "Should be %i: %i\n";

@@ -1,4 +1,4 @@
-// test removal of unused expressions
+// Test removal of unused expressions
 
 void f(){
 }

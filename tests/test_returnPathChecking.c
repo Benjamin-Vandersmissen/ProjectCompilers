@@ -1,5 +1,4 @@
-// Test the return from non-void function
-
+// Test the return from non-void function error
 
 int f1(){
     return 0;

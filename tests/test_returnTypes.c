@@ -1,5 +1,4 @@
-// test typechecking for return statements
-
+// Test typechecking for return statements
 
 // should warn
 char f1(){

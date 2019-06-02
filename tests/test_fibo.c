@@ -1,3 +1,5 @@
+// Test if the compiler kan compile a fibonacci number program
+
 #include <stdio.h>
 int a = 0;
 int b = 10;
