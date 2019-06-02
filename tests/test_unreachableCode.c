@@ -1,6 +1,9 @@
 // test not generating useless code after return statement
 
 int test(){
+    if(0){
+        return 10;
+    }
     int a = 0;
     while(a){
         int b = 0;

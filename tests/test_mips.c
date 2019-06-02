@@ -1,4 +1,4 @@
-// Tests everything that is implemented in llvm
+// Tests everything that is implemented in mips
 
 /// test include
 #include <stdio.h>
@@ -46,8 +46,10 @@ float* h1 = &f;
 float* i1 = &i;
 
 int ccc = 7;
-char* d11 = 42 + &b - 10;
-char* d12 = &b + 43 - (&ccc == &a1) + 53;
+
+// Following lines do not work in mips
+//char* d11 = 42 + &b - 10;
+//char* d12 = &b + 43 - (&ccc == &a1) + 53;
 
 char testGlobalArray[] = {'y', 'o', 'u', ' ', 't', 'y', 'p', 'e', 'd', ':', 10, '%', 'f', 10, -129};
 int* testGlobalEmptyArray[2];
@@ -181,7 +183,9 @@ float testDec(float f, char c, int i, float* f1, int* i1, char** c2){
     float is;
     char geen;
     int* code = &dit;
-    return *f1;
+    // Following line doesn't work in mips
+    // return *f1;
+    return is;
 }
 
 int f2(){

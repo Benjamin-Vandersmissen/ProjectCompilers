@@ -2,7 +2,7 @@ int f(float* a){
     return 0;
 }
 
-int main(){
+int main(){  // warnings for conversions
     int a;
     float b;
     a = b;

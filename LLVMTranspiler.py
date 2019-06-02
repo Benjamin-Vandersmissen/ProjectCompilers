@@ -205,8 +205,6 @@ class Stack:
 
     # allocate temporary for a word
     def allocate_temp(self, variable, type):
-        if variable == '%39':  # TODO: delete
-            print()
         self.temporaries[variable] = '$t{}'.format(uniques(self.temporaries))
         self.add_variable_type(variable, type)
 
@@ -301,8 +299,6 @@ class Stack:
 
     def assign_same_temporary(self, newRegister, oldRegister):  # geef newRegister dezelfde temporary als oldRegister
         # Vooral gebruikt bij operations met een immediate
-        if newRegister == '%39':  # TODO: delete
-            print()
         if oldRegister in self.temporaries:
             self.temporaries[newRegister] = self.temporaries[oldRegister]
         if oldRegister in self.f_temporaries:
@@ -705,9 +701,6 @@ class LLVMTranspiler:
 
             self._positiontables[-1].typeTable[lhs] = type
 
-            if lhs == '%39':  # TODO: delete
-                print()
-
             if self._positiontables[-1].position(lhs) is None:
                 if tokens[3] == 'float':
                     self._positiontables[-1].allocate_float_temp(lhs, type)
@@ -734,8 +727,6 @@ class LLVMTranspiler:
                 if type == 'float':
                     self._textFragment += 'lw $v1, ({})\n'.format(from_register)
                     self._textFragment += 'mtc1 $v1, {}\n'.format(to_register)
-                    if to_register == '$t2':  # TODO: delete
-                        print()
                 else:
                     self._textFragment += 'lw {}, ({})\n'.format(to_register, from_register)
 
