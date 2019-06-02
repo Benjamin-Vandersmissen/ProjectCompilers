@@ -452,9 +452,12 @@ class LLVMTranspiler:
 
         else:  # sla immediate op op stack of in globale variabele
             lhs_type = tokens[1]
-            rhs_type = self._positiontables[-1].typeTable[register]
+
             if '@' in to_register:
+                rhs_type = self._positiontables[-1].globalTypeTable[register]
                 to_register = getGlobalName(to_register)
+            else:
+                rhs_type = self._positiontables[-1].typeTable[register]
 
             if lhs_type == rhs_type:
                 self._textFragment += 'li $v1, {}\n'.format(value)
