@@ -193,6 +193,8 @@ class Stack:
 
     # allocate temporary for a word
     def allocate_temp(self, variable, type):
+        if variable == '%39':  # TODO: delete
+            print()
         self.temporaries[variable] = '$t{}'.format(uniques(self.temporaries))
         self.typeTable[variable] = type
 
@@ -287,6 +289,8 @@ class Stack:
 
     def assign_same_temporary(self, newRegister, oldRegister):  # geef newRegister dezelfde temporary als oldRegister
         # Vooral gebruikt bij operations met een immediate
+        if newRegister == '%39':  # TODO: delete
+            print()
         if oldRegister in self.temporaries:
             self.temporaries[newRegister] = self.temporaries[oldRegister]
         if oldRegister in self.f_temporaries:
@@ -344,7 +348,7 @@ class LLVMTranspiler:
             type = tokens[4]
 
         elif 'getelementptr' in tokens:
-            print(tokens)
+            # print(tokens)
             type = 'test'
             value = 'test'
 
@@ -413,6 +417,9 @@ class LLVMTranspiler:
         register = tokens[4]
         to_register = self._positiontables[-1].position(register)
 
+        if value == 'null':
+            value = '0'
+
         if '%' in value:  # sla temporary op op de stack of sla argumenten op op stack
             lhs_type = self._positiontables[-1].typeTable[value]
             rhs_type = self._positiontables[-1].typeTable[register]
@@ -432,8 +439,11 @@ class LLVMTranspiler:
 
             elif lhs_type+'*' == rhs_type:  # pak referentie van variabele
                 from_register = self._positiontables[-1].position(value)
-                self._textFragment += 'la $v1, {}\n'.format(from_register)
-                self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
+                if from_register[0] == '$':
+                    self._textFragment += 'sw {}, {}\n\n'.format(from_register, to_register)
+                else:
+                    self._textFragment += 'la $v1, {}\n'.format(from_register)
+                    self._textFragment += 'sw $v1, {}\n\n'.format(to_register)
 
         elif '@' in value:  # sla pointer naar globale variabele op
             value = getGlobalName(value)
@@ -468,7 +478,10 @@ class LLVMTranspiler:
             pass
         elif tokens[2][0] == '%':
             from_register = self._positiontables[-1].position(tokens[2])
-            self._textFragment += 'move $v0, {}\n'.format(from_register)
+            if '$f' in from_register:
+                self._textFragment += 'mtc1 $v0, {}\n\n'.format(from_register)
+            else:
+                self._textFragment += 'move $v0, {}\n'.format(from_register)
         elif tokens[2][0] == '@':
             var = getGlobalName(tokens[2])
             self._textFragment += 'lw $v0, {}\n'.format(var)
@@ -568,6 +581,9 @@ class LLVMTranspiler:
         lhs = tokens[4]
         rhs = tokens[5]
 
+        if operator == 'sdiv':
+            operator = operator[1:]
+
         if lhs[0] == '%':  # lhs is temporary
 
             if rhs[0] == '%':  # gebruik lokale variabele
@@ -584,8 +600,12 @@ class LLVMTranspiler:
                 if to_register is None:
                     self._positiontables[-1].assign_same_temporary(tokens[0], lhs)
                     to_register = self._positiontables[-1].position(tokens[0])
-                operator += 'i'
-                self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register, rhs)
+                if operator == 'mul' or operator == 'div':
+                    self._textFragment += 'li $v1, {}\n'.format(rhs)
+                    self._textFragment += '{} {}, {}, $v1\n'.format(operator, to_register, to_register)
+                else:
+                    operator += 'i'
+                    self._textFragment += '{} {}, {}, {}\n'.format(operator, to_register, to_register, rhs)
 
         else:  # lhs is immediate
 
@@ -670,6 +690,9 @@ class LLVMTranspiler:
 
             self._positiontables[-1].typeTable[lhs] = type
 
+            if lhs == '%39':  # TODO: delete
+                print()
+
             if self._positiontables[-1].position(lhs) is None:
                 if tokens[3] == 'float':
                     self._positiontables[-1].allocate_float_temp(lhs, type)
@@ -681,7 +704,10 @@ class LLVMTranspiler:
 
             if '@' in rhs:
                 from_register = getGlobalName(rhs)
-                self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
+                if '$f' in to_register:
+                    self._textFragment += 'l.s {}, {}\n'.format(to_register, from_register)
+                else:
+                    self._textFragment += 'lw {}, {}\n'.format(to_register, from_register)
 
             elif '$sp' in from_register:  # load variable in temporary
                 if type == 'float':
@@ -693,6 +719,8 @@ class LLVMTranspiler:
                 if type == 'float':
                     self._textFragment += 'lw $v1, ({})\n'.format(from_register)
                     self._textFragment += 'mtc1 $v1, {}\n'.format(to_register)
+                    if to_register == '$t2':  # TODO: delete
+                        print()
                 else:
                     self._textFragment += 'lw {}, ({})\n'.format(to_register, from_register)
 
@@ -705,7 +733,7 @@ class LLVMTranspiler:
 
         # mogelijke LLVM comparators zijn slt(<), sgt(>), eq(==). mogelijke MIPS comparators zijn slt(<), sgt(), seq(==)
 
-        if comparator == 'eq':
+        if comparator == 'eq' or comparator == 'ne':
             comparator = 's' + comparator
 
         if '%' in lhs:  # lhs is temporary
@@ -920,7 +948,7 @@ class LLVMTranspiler:
                                 i -= 1
                                 continue
 
-                if tokens[2] == 'add' or tokens[2] == 'sub' or tokens[2] == 'mul' or tokens[2] == 'div':
+                if tokens[2] == 'add' or tokens[2] == 'sub' or tokens[2] == 'mul' or tokens[2] == 'sdiv':
                     self.operation(tokens)
 
                 elif tokens[2] == 'fadd' or tokens[2] == 'fsub' or tokens[2] == 'fmul' or tokens[2] == 'fdiv':
@@ -967,6 +995,9 @@ class LLVMTranspiler:
                 elif tokens[2] == 'bitcast':
                     # cast pointer to other pointer
                     self.bitcast(tokens)
+
+                else:
+                    print('Unsupported operation')
 
         return retvalue
 
