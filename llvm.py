@@ -240,7 +240,7 @@ def changeLLVMType(targetType, varName, funcDef, file): #, dereference=False):
         if isPointer(varType):  # If the variable is a pointer
             if isPointer(targetType):  # If target type is a pointer
                 operation = 'bitcast'
-            elif targetType == 'i64':
+            elif targetType == 'i64' or targetType == 'i32' or targetType == 'i8':
                 operation = 'ptrtoint'
             else:
                 raise Exception('Unknown target type "' + str(varType) + '" in the function changeLLVMType!')

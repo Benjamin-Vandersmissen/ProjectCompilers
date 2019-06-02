@@ -1,35 +1,28 @@
-// Test if the compiler kan compile a fibonacci number program
+// Test if warnings are given at needed moments
 
-#include <stdio.h>
-int a = 0;
-int b = 10;
-float c = 0.1;
-
-int fibo(int count){
-    if (count < 0){
-        char error[] = "Index needs to be higher than 0";
-        printf(error);
-        return -1;
-    }
-    if (count == 1)
-        return 1;
-    if (count == 2)
-        return 1;
-    return fibo(count-1) + fibo(count-2);
+int f(float* a){
+    return 0;
 }
 
+int main(){  // warnings for conversions
+    int a;
+    float b;
+    a = b;
 
-int main(){
+    int* c;
+    int ** d;
+    int* e[2];
+    float* f1;
 
-    char inp[] = "%i";
+    c = d;
+    d = c;
+    d = e;
+    c = a;
+    a = c;
+    f1 = c;
 
-    char test[] = "fibo(%i) = %i";
+    e[0] = e;
 
-    int count = 3;
-    scanf(inp, &count);
-    int retvalue = fibo(count);
-    if (retvalue == -1)
-        return 1;
-    printf(test, count, retvalue);
-return 0;
+    f(c);
+    return 0;
 }

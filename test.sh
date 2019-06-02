@@ -2,7 +2,7 @@
 java -jar antlr-4.7.2-complete.jar -Dlanguage=Python3 smallC.g4 -visitor
 for filename in tests/*.c
 do
-    printf "\n\n(bash) Starting: $filename \n"
+    printf "\n(bash) Starting: $filename \n"
 
     if [ "$filename" == "tests/test_llvm.c" ]; then
         python3 c2llvm.py "$filename"
@@ -15,5 +15,5 @@ do
     printf "(bash) Making image of dot...\n"
     dot -Tpng "${filename%.*}.dot" -o "${filename%.*}.png"
 
-    printf "(bash) End $filename"
+    printf "(bash) End $filename\n"
 done
