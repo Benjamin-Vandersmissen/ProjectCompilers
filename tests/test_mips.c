@@ -176,6 +176,11 @@ void alloctest(){
     testGlobalArrayToShort[3] = 10.0036; // write to element of array
 
     a = testLocalArray[0] + testLocalArray[4] * b;
+
+    // Conversion from pointer to int/char type
+    a = xx;
+    a = xxx;
+    d = xxxx;
 }
 
 float testDec(float f, char c, int i, float* f1, int* i1, char** c2){

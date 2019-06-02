@@ -19,7 +19,7 @@ int main(){  // warnings for conversions
     d = e;
     c = a;
     a = c;
-    f = c;
+    f1 = c;
 
     e[0] = e;
 
