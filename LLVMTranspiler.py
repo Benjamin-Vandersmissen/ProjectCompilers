@@ -933,6 +933,12 @@ class LLVMTranspiler:
                                 for expression in reversed(unused_expressions):
                                     temp_vars = [token for token in expression if token[0] == '%']
                                     if 'load' not in expression and 'call' not in expression:
+
+                                        if tokens[-2] == 'to':  # cast to type
+                                            self._positiontables[-1].add_variable_type(temp_vars[0], tokens[-1])
+                                        else:  # normal operation
+                                            self._positiontables[-1].add_variable_type(temp_vars[0], tokens[3])
+
                                         self._positiontables[-1].assign_same_temporary(temp_vars[1], temp_vars[0])
 
                                 # insert unused expressions before the first used expression behind it
