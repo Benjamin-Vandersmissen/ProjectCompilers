@@ -1004,6 +1004,10 @@ class LLVMTranspiler:
                     # cast pointer to other pointer
                     self.bitcast(tokens)
 
+                elif tokens[2] == 'inttoptr':
+                    # cast int to pointer
+                    self._positiontables[-1].assign_same_temporary(variables[0], variables[1])
+
                 else:
                     print('Unsupported operation')
 
