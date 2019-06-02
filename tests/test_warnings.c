@@ -18,6 +18,7 @@ int main(){  // warnings for conversions
     d = c;
     d = e;
     c = a;
+    a = c;
     f = c;
 
     e[0] = e;
