@@ -1061,6 +1061,10 @@ class LLVMTranspiler:
                     # cast int to pointer
                     self._positiontables[-1].assign_same_temporary(variables[0], variables[1])
 
+                elif tokens[2] == 'ptrtoint':
+                    # cast pointer to int
+                    self._positiontables[-1].assign_same_temporary(variables[0], variables[1])
+
                 else:
                     print('Unsupported operation')
 

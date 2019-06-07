@@ -12,14 +12,14 @@ int main(){  // warnings for conversions
     int* c;
     int ** d;
     int* e[2];
-    float* f;
+    float* f1;
 
     c = d;
     d = c;
     d = e;
     c = a;
     a = c;
-    f = c;
+    f1 = c;
 
     e[0] = e;
 
