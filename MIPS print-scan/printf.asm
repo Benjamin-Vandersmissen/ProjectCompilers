@@ -2,34 +2,6 @@
 error: .asciiz "unrecognised parameter %"
 
 .text
-# %c #c
-li $t0, 0
-sw $t0, ($sp)
-li $t0, 50
-sw $t0, -4($sp)
-li $t0, 37
-sw $t0, -8($sp)
-li $t0, 99
-sw $t0, -12($sp)
-li $t0, 37
-sw $t0, -16($sp)
-
-la $a0, ($sp)
-subu $sp, $sp, 28
-
-li $t0, 60
-sw $t0, 4($sp)
-li $t0, 61
-sw $t0, 8($sp)
-
-li $a1, 2
-move $fp, $sp #temporary, verander in uiteindelijke code 
-
-main:
-jal printf
-li $v0, 10
-syscall
-
 # a0 = pointer naar string, a1 = #argumenten, argumenten staan op de stack 
 
 # $t0 = pointer naar string
@@ -37,6 +9,7 @@ syscall
 # $t2 = positie in string
 # $t3 = character dat nu bekeken wordt
 # $t4 = variabele die geparsed wordt
+# $t5 = temporary voor %s
 
 printf:
 move $t0, $a0 # Sla pointer op in 
@@ -65,7 +38,7 @@ lw $t3, ($t3)
 addi $t2, $t2, 4
 
 # Laad variabele in
-la $t4, ($fp)
+la $t4, ($sp)
 addu $t4, $t4, $t1
 subu $t1, $t1, 4 # update offset van variabele
 
@@ -74,8 +47,9 @@ beq $t3, 0, endPrint
 beq $t3, 105, printInt # %i = int
 beq $t3, 102, printFloat # %f = float
 beq $t3, 99, printChar # %c = char
+beq $t3, 115, printString # %s = string
 
-# Error als het niet 1 vd 3 aanvaarde paramters is 
+# Error als het niet 1 vd 4 aanvaarde parameters is 
 la $a0, error
 li $v0, 4
 syscall
@@ -100,6 +74,17 @@ printChar:
 li $v0, 11
 syscall
 b p_processChar
+
+printString:
+# Each char has 32 bit instead of 8 bit in our implementation
+move $t5, $a0
+printString1:
+lw $a0, ($t5)
+beqz $a0, p_processChar
+li $v0, 11
+syscall
+addiu $t5, $t5, 4
+b printString1
 
 endPrint:
 jr $ra

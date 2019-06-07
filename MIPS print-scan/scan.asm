@@ -2,28 +2,6 @@
 error: .asciiz "unrecognised parameter %"
 
 .text
-# %c #c
-li $t0, 0
-sw $t0, ($sp)
-li $t0, 37
-sw $t0, -4($sp)
-li $t0, 102
-sw $t0, -8($sp)
-
-la $a0, ($sp)
-
-la $t0, -12($sp)
-sw $t0, -16($sp)
-subu $sp, $sp, 20
-
-li $a1, 1
-move $fp, $sp #temporary, verander in uiteindelijke code 
-
-main:
-jal scanf
-li $v0, 10
-syscall
-
 # a0 = pointer naar string, a1 = #argumenten, argumenten staan op de stack 
 
 # $t0 = pointer naar string
@@ -31,6 +9,7 @@ syscall
 # $t2 = positie in string
 # $t3 = character dat nu bekeken wordt
 # $t4 = Addres van variabele die geparsed wordt
+# $t5-$t7 = temporary variables for %s
 
 scanf:
 move $t0, $a0 # Sla pointer op in 
@@ -53,7 +32,7 @@ lw $t3, ($t3)
 addi $t2, $t2, 4
 
 # Laad variabele in
-la $t4, ($fp)
+la $t4, ($sp)
 addu $t4, $t4, $t1
 subu $t1, $t1, 4 # update offset van variabele
 lw $t4, ($t4) 
@@ -62,12 +41,13 @@ beq $t3, 0, endScan
 beq $t3, 105, scanInt # %i = int
 beq $t3, 102, scanFloat # %f = float
 beq $t3, 99, scanChar # %c = char
+beq $t3, 115, scanString # %s = string
 
 # Error als het niet 1 vd 3 aanvaarde paramters is 
 la $a0, error
 li $v0, 4
 syscall
-move $a0, $t4
+move $a0, $t3
 li $v0, 11
 syscall
 li $v0, 10
@@ -80,7 +60,6 @@ sw $v0, ($t4)
 b s_processChar
 
 scanFloat:
-mtc1 $a0, $f12
 li $v0, 6
 syscall
 swc1 $f0, ($t4)
@@ -91,6 +70,38 @@ li $v0, 12
 syscall
 sw $v0, ($t4)
 b s_processChar
+
+scanString:
+li $v0, 8
+move $a0, $t4
+li $a1, 255 # buffer is 255 bytes => 255 characters including 0 terminator
+syscall
+move $t5, $a0
+move $t7, $sp
+
+scanString1: # convert each char to a word
+lb $t6, ($t5)
+beq $t6, 10, scanString2  # strings are terinated by \n in input = 10 instead of 0
+sw $t6, ($t7)
+addiu $t5, $t5, 1
+subiu $t7, $t7, 4
+b scanString1
+
+scanString2:
+sw $zero, ($t7)
+subiu $t7, $t7, 4
+subu $t6, $sp, $t7  # offset
+
+scanString3: # replace byte string with word string
+beqz $t6, s_processChar
+subu $t5, $sp, $t6
+addiu $t5, $t5, 4
+lw $t7, ($t5)
+addu $t5, $t4, $t6
+subiu $t5, $t5, 4
+sw $t7, ($t5)
+subu $t6, $t6, 4
+b scanString3
 
 endScan:
 jr $ra

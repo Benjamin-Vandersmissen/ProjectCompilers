@@ -32,6 +32,8 @@ beq $t3, 0, endPrint
 beq $t3, 105, printInt
 beq $t3, 102, printFloat
 beq $t3, 99, printChar
+beq $t3, 115, printString
+
 la $a0, error
 li $v0, 4
 syscall
@@ -56,6 +58,16 @@ printChar:
 li $v0, 11
 syscall
 b p_processChar
+
+printString:
+move $t5, $a0
+printString1:
+lw $a0, ($t5)
+beqz $a0, p_processChar
+li $v0, 11
+syscall
+addiu $t5, $t5, 4
+b printString1
 
 endPrint:
 jr $ra
@@ -86,12 +98,14 @@ subu $t1, $t1, 4
 lw $t4, ($t4) 
 beq $t3, 0, endScan
 beq $t3, 105, scanInt 
-beq $t3, 102, scanFloat
-beq $t3, 99, scanChar
+beq $t3, 102, scanFloat 
+beq $t3, 99, scanChar 
+beq $t3, 115, scanString 
+
 la $a0, error
 li $v0, 4
 syscall
-move $a0, $t4
+move $a0, $t3
 li $v0, 11
 syscall
 li $v0, 10
@@ -104,7 +118,6 @@ sw $v0, ($t4)
 b s_processChar
 
 scanFloat:
-mtc1 $a0, $f12
 li $v0, 6
 syscall
 swc1 $f0, ($t4)
@@ -115,6 +128,38 @@ li $v0, 12
 syscall
 sw $v0, ($t4)
 b s_processChar
+
+scanString:
+li $v0, 8
+move $a0, $t4
+li $a1, 255
+syscall
+move $t5, $a0
+move $t7, $sp
+
+scanString1: 
+lb $t6, ($t5)
+beq $t6, 10, scanString2  
+sw $t6, ($t7)
+addiu $t5, $t5, 1
+subiu $t7, $t7, 4
+b scanString1
+
+scanString2:
+sw $zero, ($t7)
+subiu $t7, $t7, 4
+subu $t6, $sp, $t7  # offset
+
+scanString3: 
+beqz $t6, s_processChar
+subu $t5, $sp, $t6
+addiu $t5, $t5, 4
+lw $t7, ($t5)
+addu $t5, $t4, $t6
+subiu $t5, $t5, 4
+sw $t7, ($t5)
+subu $t6, $t6, 4
+b scanString3
 
 endScan:
 jr $ra
@@ -279,6 +324,7 @@ class Stack:
         for temp in set(self.temporaries.values()):
             retvalue += "sw {}, -{}($sp)\n".format(temp, i)
             i += 4
+        self._stack += int(i/4)*['temp']
         retvalue += "subu $sp, $sp, {}\n\n".format(i)
         return retvalue
 
@@ -294,7 +340,10 @@ class Stack:
             i += 4
             retValue += "lwc1 {}, {}($sp)\n".format(temp, i)
 
-        retValue += "addu $sp, $sp, {}\n\n".format(i)
+        if i > 0:
+            retValue += "addu $sp, $sp, {}\n\n".format(i)
+        for j in range(int(i/4)):
+            self._stack.pop()
         return retValue
 
     def assign_same_temporary(self, newRegister, oldRegister):  # geef newRegister dezelfde temporary als oldRegister
@@ -510,6 +559,8 @@ class LLVMTranspiler:
             string_position = self._positiontables[-1].position(tokens[tokens.index(identifier) + 2])
             self._textFragment += 'la $a0, {}\n'.format(string_position)
             for j in range(tokens.index(identifier) + 4, len(tokens), 2):
+                if tokens[j] == 'signext':
+                    j += 1
                 parameters.append(tokens[j])
             self._textFragment += 'li $a1, {}\n'.format(len(parameters))
             identifier = identifier[1:]
@@ -518,6 +569,8 @@ class LLVMTranspiler:
             string_position = self._positiontables[-1].position(tokens[tokens.index(identifier) + 2])
             self._textFragment += 'la $a0, {}\n'.format(string_position)
             for j in range(tokens.index(identifier) + 4, len(tokens), 2):
+                if tokens[j] == 'signext':
+                    j += 1
                 parameters.append(tokens[j])
             self._textFragment += 'li $a1, {}\n'.format(len(parameters))
             identifier = identifier[1:]
