@@ -1256,7 +1256,7 @@ class FloatValueNode(ValueNode):
             self.integer = int(token)
         else:
             self.fraction = token
-            self.value = float(str(self.integer) + '.' + str(self.fraction))
+            self.value = self.sign * float(str(self.integer) + '.' + str(self.fraction))
 
     def text(self):
         return ('-' if self.sign < 0 else '') + str(self.value)
