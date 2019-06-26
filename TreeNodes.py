@@ -1223,7 +1223,7 @@ class IntValueNode(ValueNode):
         elif token == '-':
             self.sign *= -1
             return
-        self.value = int(token)
+        self.value = self.sign * int(token)
 
     def text(self):
         return ('-' if self.sign < 0 else '') + str(self.value)
